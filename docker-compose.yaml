@@ -1,0 +1,11 @@
+---
+services:
+  status-backend:
+    image: harbor.status.im/bi/status-backend:dev
+    container_name: status-backend
+    ports:
+      - 8080:8080
+      - 8545:8545
+      - 30303:30303
+    entrypoint: 'status-backend'
+    command: '-address 0.0.0.0:8080'
