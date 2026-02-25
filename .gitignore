@@ -211,3 +211,4 @@ __marimo__/
 .vscode/
 *.json
 *.ipynb
+/data-dir

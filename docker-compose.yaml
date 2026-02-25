@@ -9,3 +9,5 @@ services:
       - 30303:30303
     entrypoint: 'status-backend'
     command: '-address 0.0.0.0:8080'
+    volumes:
+      - ./data-dir:/data-dir
