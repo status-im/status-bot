@@ -13,3 +13,5 @@ matplotlib>=3.5.0
 eth-typing~=5.2.1
 faker~=37.6.0
 qrcode
+pandas
+pyyaml

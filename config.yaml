@@ -1,0 +1,15 @@
+postgres:
+  schema: "status_app_monitoring"
+  tables:
+    messages: "raw_messages"
+    community: "community_info"
+
+status_app:
+  bot_name: "snt-maxxer"
+  channels:
+    - https://status.app/c/G6EAAMSs5eYUrSjkDriqGHx1OITK3bd8aUlQKA9M5Mg08uTbwYKNMVxLXxDGfzde3Ub9OeDeNCmVTbP-vZs-rsCtWIUKDBBWUBXrEaGpJQ5Kaj0o4pYlcJ0iLlnP-MQRxCRwy3pE3JOiMxYYIyb4WtmaksZHTHQKCLUc14iNpWoidEbVeeO2g931cXu8Lns3Bw==#zQ3shsFYujbDQdRhSKS9RHuGCwxHQ1WLkNYvGPRksf4ebDWFW
+  
+  backend_params:
+    url: "http://localhost:8080"
+    logLevel: "INFO"
+    data_dir: "./data-dir"

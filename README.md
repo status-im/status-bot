@@ -32,7 +32,7 @@ pip install -r requirements.txt
 
 ## Files
 
-- `create_account.py` - create a Status App account for the given `username` and `password`. Example run:
+- `create_account.py` - create a Status App account for the given `username` and `password`. Example runs:
 
 ```bash
 python create_account.py -u snt-maxxer -p StatusApp#123
@@ -41,3 +41,5 @@ python create_account.py -u snt-maxxer -p StatusApp#123
 ```bash
 python create_account.py --username snt-maxxer --password StatusApp#123
 ```
+
+- `download.py` - download all messages and overall community info from the specified Status App channels in `config.yaml`.

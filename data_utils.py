@@ -2,7 +2,7 @@
 Function that simplify the Status Backend data extraction process
 """
 from clients.status_backend import StatusBackend
-import os, json, datetime
+import os, json, datetime, json
 import constants
 
 def login(backend: StatusBackend, username: str, is_chat: bool = True) -> dict:
@@ -64,8 +64,10 @@ def get_community_info(backend: StatusBackend, url: str) -> dict:
         raise Exception(f"No community info found for {url}")
 
     to_datetime = lambda key: datetime.datetime.fromtimestamp(community_info[key]) if key in community_info else None
+    extract_timestamp = datetime.datetime.now()
     data = {
         "community_id": community_info["id"],
+        "community_name": community_info["name"],
         "url": url,
         "verified": community_info["verified"],
         "description": community_info["description"],
@@ -76,11 +78,22 @@ def get_community_info(backend: StatusBackend, url: str) -> dict:
         "joined_timestamp": to_datetime("joinedAt"),
         "requested_timestamp": to_datetime("requestedToJoinAt"),
         "encrypted": community_info["encrypted"],
-        "members": len(community_info["members"].keys()),
+        "members": {
+            "total": len(community_info["members"].keys()),
+            "info": [
+                {
+                    "member_id": member_id, 
+                    "last_checked": datetime.datetime.fromtimestamp(info["last_update_clock"]) if "last_update_clock" in info else None,
+                    "extract_timestamp": extract_timestamp
+                } 
+                for member_id, info in community_info["members"].items()
+            ]
+        },
         "channels": [
             {
                 "community_id": community_info["id"],
-                "channel_id": chat_info["id"], 
+                "channel_id": chat_info["id"],
+                "chat_id": community_info["id"] + chat_info["id"],
                 "category_id": chat_info["categoryID"] if len(chat_info["categoryID"]) > 0 else None,
                 "channel_name": chat_info["name"], 
                 "description": chat_info["description"],
@@ -116,7 +129,7 @@ def get_contacts(backend: StatusBackend) -> list[dict]:
 
 
 
-def get_messages(backend: StatusBackend, chat_id: str, folder: str, pagination: int = 100, batch_size: int = 10):
+def save_messages(backend: StatusBackend, chat_id: str, folder: str, community_info: dict, pagination: int = 100, batch_size: int = 10):
     """
     Get all of the mesages from a chat.
     NOTE: You have to be logged in to Status app already!
@@ -127,17 +140,36 @@ def get_messages(backend: StatusBackend, chat_id: str, folder: str, pagination: 
         - `pagination` - how many results to get per `.chat_messages` call
         - `batch_size` - the number of messages that will be turned into a batch
     """
+    def save_batch(messages: list[str], folder: str):
+        timestamp = datetime.datetime.now().timestamp()
+
+        file_path = os.path.join(folder, str(datetime.datetime.now().timestamp()).replace(".", "") + ".json")
+        data = {
+            "metadata": {
+                "file_path": file_path,
+                "created_at": timestamp,
+                "total_messages": len(messages),
+                "earliest_msg_timestamp": min(messages, key=lambda d: d["sent_timestamp"])["sent_timestamp"],
+                "latest_msg_timestamp": max(messages, key=lambda d: d["sent_timestamp"])["sent_timestamp"],
+            },
+            "messages": messages,
+        }
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+
+    os.makedirs(folder, exist_ok=True)
     messages = []
     cursor = None
     mappings = {
         "id": "message_id",
-        "chatId": "chat_id",
+        "chatId": "channel_id",
         "timestamp": "sent_timestamp",
         "compressedKey": "from_key",
         "emojiHash": "from_emojis",
         "parsedText": "parsed_text",
         "text": "markdown_text",
         "editedAt": "edited_timestamp",
+        "links": "links"
     }
     finished = False
     while not finished:
@@ -152,10 +184,13 @@ def get_messages(backend: StatusBackend, chat_id: str, folder: str, pagination: 
 
         messages += [
             {
-                target_key: msg[msg_key]
-                for msg_key, target_key in mappings.items()
-                if msg_key in msg
-            } 
+                "community_id": community_info["community_id"],
+                "channel_id": community_info["channel_id"],
+                "chat_id": community_info["chat_id"],
+                "channel_category_id": community_info["category_id"],
+                **{target_key: msg[msg_key] for msg_key, target_key in mappings.items() if msg_key in msg},
+                "extracted_at": datetime.datetime.now().timestamp()
+            }
             for msg in chat["messages"]
         ]
         if len(chat["cursor"]) > 0:
@@ -163,5 +198,10 @@ def get_messages(backend: StatusBackend, chat_id: str, folder: str, pagination: 
 
         finished = len(chat["cursor"]) == 0
         
+        if len(messages) >= batch_size:
+            save_batch(messages, folder)
+            messages = []
         
-    return messages
+    
+    if messages:
+        save_batch(messages, folder)
