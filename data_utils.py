@@ -2,6 +2,7 @@
 Function that simplify the Status Backend data extraction process
 """
 from clients.status_backend import StatusBackend
+from typing import Optional
 import os, json, datetime, json
 import constants
 
@@ -129,7 +130,16 @@ def get_contacts(backend: StatusBackend) -> list[dict]:
 
 
 
-def save_messages(backend: StatusBackend, chat_id: str, folder: str, community_info: dict, pagination: int = 100, batch_size: int = 10):
+def save_messages(
+        backend: StatusBackend, 
+        chat_id: str, 
+        folder: str, 
+        community_info: dict, 
+        start_timestamp: Optional[datetime.datetime] = None, 
+        end_timestamp: Optional[datetime.datetime] = None, 
+        pagination: int = 100, 
+        batch_size: int = 10
+    ):
     """
     Get all of the mesages from a chat.
     NOTE: You have to be logged in to Status app already!
@@ -139,6 +149,8 @@ def save_messages(backend: StatusBackend, chat_id: str, folder: str, community_i
         - `folder` - where the batched data will be saved
         - `pagination` - how many results to get per `.chat_messages` call
         - `batch_size` - the number of messages that will be turned into a batch
+        - `start_timestamp` - the start extraction timestamp. Messages before this timestamp will be ignored.
+        - `end_timestamp` - the end extraction timestamp. Messages after this timestamp will be ignored.
     """
     def save_batch(messages: list[str], folder: str):
         timestamp = datetime.datetime.now().timestamp()
@@ -157,12 +169,26 @@ def save_messages(backend: StatusBackend, chat_id: str, folder: str, community_i
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
 
+    is_none = lambda value: isinstance(value, type(None))
+    now = datetime.datetime.now()
+    if is_none(start_timestamp):
+        # `backend.wakuext_service.chat_messages` will only return you known / fetched messages for this channel. 
+        # Without enabling community archives feature you can only fetch last 30 days (from waku store nodes).
+        start_timestamp = now - datetime.timedelta(days=30)
+    
+    if is_none(end_timestamp):
+        # t-1 is a safe assumption that messages will not be further modified / emojis added
+        end_timestamp = (now - datetime.timedelta(days=1)).replace(minute=0, second=0, hour=0, microsecond=0)
+
+    if start_timestamp > end_timestamp:
+        raise Exception(f"Start timestamp ({start_timestamp}) cannot be greater than the end one ({end_timestamp})")
+
     os.makedirs(folder, exist_ok=True)
     messages = []
     cursor = None
     mappings = {
         "id": "message_id",
-        "chatId": "channel_id",
+        "chatId": "chat_id",
         "timestamp": "sent_timestamp",
         "compressedKey": "from_key",
         "emojiHash": "from_emojis",
@@ -181,22 +207,30 @@ def save_messages(backend: StatusBackend, chat_id: str, folder: str, community_i
             params["cursor"] = cursor
         
         chat: dict = backend.wakuext_service.chat_messages(**params)
-
-        messages += [
-            {
+        for msg in chat["messages"]:
+            point = {
                 "community_id": community_info["community_id"],
-                "channel_id": community_info["channel_id"],
-                "chat_id": community_info["chat_id"],
+                "channel_id": community_info["chat_id"].replace(community_info["community_id"], ""),
                 "channel_category_id": community_info["category_id"],
                 **{target_key: msg[msg_key] for msg_key, target_key in mappings.items() if msg_key in msg},
                 "extracted_at": datetime.datetime.now().timestamp()
             }
-            for msg in chat["messages"]
-        ]
-        if len(chat["cursor"]) > 0:
+            point["sent_timestamp"] /= 1_000
+            timestamp = datetime.datetime.fromtimestamp(point["sent_timestamp"])
+            if timestamp > end_timestamp:
+                continue
+
+            if timestamp < start_timestamp:
+                finished = True
+                break
+
+            messages.append(point)
+            
+
+        if len(chat["cursor"]) > 0 and not finished:
             cursor: str = chat["cursor"]
 
-        finished = len(chat["cursor"]) == 0
+        finished = bool(cursor)
         
         if len(messages) >= batch_size:
             save_batch(messages, folder)
