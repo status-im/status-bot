@@ -20,6 +20,12 @@ if __name__ == "__main__":
             pickle.dump(community, f)
 
         for channel in community["channels"]:
+            params = {
+                "backend": backend,
+                "chat_id": channel["chat_id"],
+                "folder": message_folder,
+                "community_info": channel
+            }
             data_utils.save_messages(backend, channel["chat_id"], message_folder, channel)
 
     backend.logout()

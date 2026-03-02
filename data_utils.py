@@ -147,10 +147,10 @@ def save_messages(
     Params:
         - `chat_id` - the chat id that will be scraped
         - `folder` - where the batched data will be saved
-        - `pagination` - how many results to get per `.chat_messages` call
-        - `batch_size` - the number of messages that will be turned into a batch
         - `start_timestamp` - the start extraction timestamp. Messages before this timestamp will be ignored.
         - `end_timestamp` - the end extraction timestamp. Messages after this timestamp will be ignored.
+        - `pagination` - how many results to get per `.chat_messages` call
+        - `batch_size` - the number of messages that will be turned into a batch
     """
     def save_batch(messages: list[str], folder: str):
         timestamp = datetime.datetime.now().timestamp()
