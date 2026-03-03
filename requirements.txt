@@ -15,3 +15,6 @@ faker~=37.6.0
 qrcode
 pandas
 pyyaml
+python-dotenv
+psycopg2-binary
+sqlalchemy

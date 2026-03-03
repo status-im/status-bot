@@ -2,7 +2,8 @@ postgres:
   schema: "status_app_monitoring"
   tables:
     messages: "raw_messages"
-    community: "community_info"
+    community: "raw_community_info"
+    members: "raw_community_activity"
 
 status_app:
   bot_name: "snt-maxxer"
