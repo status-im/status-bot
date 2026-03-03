@@ -213,7 +213,7 @@ def save_messages(
                 "channel_id": community_info["chat_id"].replace(community_info["community_id"], ""),
                 "channel_category_id": community_info["category_id"],
                 **{target_key: msg[msg_key] for msg_key, target_key in mappings.items() if msg_key in msg},
-                "extracted_at": datetime.datetime.now().timestamp()
+                "extracted_at_timestamp": datetime.datetime.now().timestamp()
             }
             point["sent_timestamp"] /= 1_000
             timestamp = datetime.datetime.fromtimestamp(point["sent_timestamp"])
@@ -230,7 +230,7 @@ def save_messages(
         if len(chat["cursor"]) > 0 and not finished:
             cursor: str = chat["cursor"]
 
-        finished = bool(cursor)
+        finished = not bool(cursor)
         
         if len(messages) >= batch_size:
             save_batch(messages, folder)
