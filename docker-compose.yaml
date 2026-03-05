@@ -13,11 +13,29 @@ services:
             - ./data-dir:/data-dir
         networks:
             - status-bridge
-
+        profiles:
+            - backend
+            - monitoring
+            - account-creation
+    status-account-creation:
+        build:
+            context: .
+            dockerfile: Dockerfile.account_creation
+        container_name: account-creation
+        depends_on:
+            - status-backend
+        env_file:
+            - .env
+        volumes:
+            - ./accounts:/app/accounts
+        networks:
+            - status-bridge
+        profiles:
+            - account-creation
     status-monitor:
         build:
             context: .
-            dockerfile: Dockerfile
+            dockerfile: Dockerfile.monitoring
         container_name: message-processing
         depends_on:
             - status-backend
@@ -26,7 +44,9 @@ services:
         environment:
             STATUS_BACKEND_HOST: status-backend
         volumes:
-            - ./accounts:/accounts
+            - ./accounts:/app/accounts
+        profiles:
+            - monitoring
         networks:
             - status-bridge
 

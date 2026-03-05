@@ -9,5 +9,5 @@ COPY . .
 RUN rm -rf data-dir
 # In case if the scripts are ran locally instead of with Docker
 RUN rm -rf uploads
-# Independent scripts
+
 CMD ["sh", "-c", "python upload.py & python download.py"]
