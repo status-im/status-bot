@@ -1,31 +1,72 @@
 from clients.status_backend import StatusBackend
+from typing import Optional, Any
+import pandas as pd
 import constants, data_utils
-import os, datetime, pickle
+import os, datetime, pickle, time, json, logging
 
-if __name__ == "__main__":
+def save_pkl(file_path: str, data: Any):
+    """
+    Save the given data into a Pickel file
 
+    Parameters:
+        - `file_path` - the path where the data will be saved
+        - `data` - the data that will be saved
+    """
+    with open(file_path, "wb") as f:
+        pickle.dump(data, f)
+
+def run(logger: logging.Logger):
     backend = StatusBackend(**constants.STATUS_BACKEND_PARAMS)
     info = data_utils.login(backend, constants.CONFIG["status_app"]["bot_name"])
-    
+    logger.info(f"Logged in with account {constants.CONFIG['status_app']['bot_name']}")
+
     message_folder = os.path.join(constants.UPLOAD_PATH, "messages")
     community_folder = os.path.join(constants.UPLOAD_PATH, "channel_info")
 
+    latest_batch_path = os.path.join(constants.UPLOAD_PATH, "start_timestamp.pkl")
+    start_timestamp: Optional[datetime.datetime] = pd.read_pickle(latest_batch_path) if os.path.exists(latest_batch_path) else None
+
     for channel_url in constants.CONFIG["status_app"]["channels"]:
+        logger.info(f"Starting {channel_url}")
         community = data_utils.get_community_info(backend, channel_url)
         current_community_folder = os.path.join(community_folder, community["community_id"])
         os.makedirs(current_community_folder, exist_ok=True)
         file_path = os.path.join(current_community_folder, str(datetime.datetime.now().timestamp()).replace(".", "") + ".pkl")
-        
-        with open(file_path, "wb") as f:
-            pickle.dump(community, f)
+        save_pkl(file_path, community)
 
         for channel in community["channels"]:
+            msg = f"Downloading messages from {community['community_name']} #{channel['channel_name']}"
+            if start_timestamp:
+                msg += f" (from {start_timestamp} onwards)"
+            logger.info(msg)
             params = {
                 "backend": backend,
                 "chat_id": channel["chat_id"],
                 "folder": message_folder,
-                "community_info": channel
+                "community_info": channel,
+                "start_timestamp": start_timestamp
             }
-            data_utils.save_messages(backend, channel["chat_id"], message_folder, channel)
+            data_utils.save_messages(**params)
 
     backend.logout()
+    logger.info(f"Logged out of {constants.CONFIG['status_app']['bot_name']}")
+
+    timestamps = []
+    for file_name in os.listdir(message_folder):
+        with open(os.path.join(message_folder, file_name), "r") as f:
+            data: dict = json.load(f)
+        timestamps.append(data["metadata"]["latest_msg_timestamp"])
+
+    if not timestamps:
+        return
+
+    save_pkl(latest_batch_path, datetime.datetime.fromtimestamp(max(timestamps)))
+
+if __name__ == "__main__":
+
+    logger = data_utils.get_logger("download")
+    while True:
+        run(logger)
+        seconds = 60 * constants.CONFIG["sleep"]["download"]
+        logger.info(f"Sleeping for {constants.CONFIG['sleep']['download']} minutes")
+        time.sleep(seconds)

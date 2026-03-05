@@ -214,3 +214,4 @@ __marimo__/
 /data-dir
 /uploads
 *.DS_Store
+*.pkl
