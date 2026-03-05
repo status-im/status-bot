@@ -3,8 +3,37 @@ Function that simplify the Status Backend data extraction process
 """
 from clients.status_backend import StatusBackend
 from typing import Optional
-import os, json, datetime, json
+import os, json, datetime, json, logging
 import constants
+
+def get_logger(caller: str) -> logging.Logger:
+    """
+    Custom logger that is used to monitor the upload and download processes
+
+    Params:
+        - `caller` - if the file is called in `download.py` or `upload.py`
+
+    Output:
+        - Initialized logger
+    """
+    # upload and download loggers should have different names
+    # if we have to store the output in a `.log` file
+    logger = logging.getLogger(f"status-monitoring-{caller}")
+    logger.propagate = False
+    if not logger.handlers:
+        logger.setLevel(logging.INFO)
+
+        handler = logging.StreamHandler()
+
+        formatter = logging.Formatter(
+            f"[%(asctime)s] [%(levelname)s]\t[{caller}]\t%(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
+
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+    return logger
 
 def login(backend: StatusBackend, username: str, is_chat: bool = True) -> dict:
     """
@@ -48,8 +77,8 @@ def login(backend: StatusBackend, username: str, is_chat: bool = True) -> dict:
 
 def get_community_info(backend: StatusBackend, url: str) -> dict:
     """
-    Get community information for the given URL. 
-    
+    Get community information for the given URL.
+
     **Note**: This function will not work if the URL is to a specific channel in a community.
 
     Parameters:
@@ -83,10 +112,10 @@ def get_community_info(backend: StatusBackend, url: str) -> dict:
             "total": len(community_info["members"].keys()),
             "info": [
                 {
-                    "member_id": member_id, 
+                    "member_id": member_id,
                     "last_checked": datetime.datetime.fromtimestamp(info["last_update_clock"]) if "last_update_clock" in info else None,
                     "extract_timestamp": extract_timestamp
-                } 
+                }
                 for member_id, info in community_info["members"].items()
             ]
         },
@@ -96,7 +125,7 @@ def get_community_info(backend: StatusBackend, url: str) -> dict:
                 "channel_id": chat_info["id"],
                 "chat_id": community_info["id"] + chat_info["id"],
                 "category_id": chat_info["categoryID"] if len(chat_info["categoryID"]) > 0 else None,
-                "channel_name": chat_info["name"], 
+                "channel_name": chat_info["name"],
                 "description": chat_info["description"],
             }
             for chat_info in list(community_info["chats"].values())
@@ -131,14 +160,14 @@ def get_contacts(backend: StatusBackend) -> list[dict]:
 
 
 def save_messages(
-        backend: StatusBackend, 
-        chat_id: str, 
-        folder: str, 
-        community_info: dict, 
-        start_timestamp: Optional[datetime.datetime] = None, 
-        end_timestamp: Optional[datetime.datetime] = None, 
-        pagination: int = 100, 
-        batch_size: int = 10
+        backend: StatusBackend,
+        chat_id: str,
+        folder: str,
+        community_info: dict,
+        start_timestamp: Optional[datetime.datetime] = None,
+        end_timestamp: Optional[datetime.datetime] = None,
+        pagination: int = 500,
+        batch_size: int = 10_00
     ):
     """
     Get all of the mesages from a chat.
@@ -172,10 +201,10 @@ def save_messages(
     is_none = lambda value: isinstance(value, type(None))
     now = datetime.datetime.now()
     if is_none(start_timestamp):
-        # `backend.wakuext_service.chat_messages` will only return you known / fetched messages for this channel. 
+        # `backend.wakuext_service.chat_messages` will only return you known / fetched messages for this channel.
         # Without enabling community archives feature you can only fetch last 30 days (from waku store nodes).
         start_timestamp = now - datetime.timedelta(days=30)
-    
+
     if is_none(end_timestamp):
         # t-1 is a safe assumption that messages will not be further modified / emojis added
         end_timestamp = (now - datetime.timedelta(days=1)).replace(minute=0, second=0, hour=0, microsecond=0)
@@ -205,7 +234,7 @@ def save_messages(
         }
         if cursor:
             params["cursor"] = cursor
-        
+
         chat: dict = backend.wakuext_service.chat_messages(**params)
         for msg in chat["messages"]:
             point = {
@@ -225,17 +254,17 @@ def save_messages(
                 break
 
             messages.append(point)
-            
+
 
         if len(chat["cursor"]) > 0 and not finished:
             cursor: str = chat["cursor"]
 
         finished = not bool(cursor)
-        
+
         if len(messages) >= batch_size:
             save_batch(messages, folder)
             messages = []
-        
-    
+
+
     if messages:
         save_batch(messages, folder)
