@@ -3,7 +3,6 @@ import json, datetime, os, time, logging
 import pandas as pd
 from pathlib import Path, PosixPath
 from postgres import Postgres
-from dotenv import load_dotenv
 
 def get_community_members(file_path: PosixPath) -> pd.DataFrame:
     """
@@ -118,6 +117,8 @@ def run(username: str, password: str, host: str, database: str, port: str, logge
         logger.info(f"Created community and member data for {file_path}")
 
     for key, value in data.items():
+        if not value:
+            continue
         data[key] = pd.concat(value, ignore_index=True)
 
     file_paths = list(path.rglob("*.json"))
@@ -135,9 +136,8 @@ def run(username: str, password: str, host: str, database: str, port: str, logge
         logger.info(f"Deleted {file_path}")
 
 if __name__ == "__main__":
-
+    os.makedirs(constants.UPLOAD_PATH, exist_ok=True)
     logger = data_utils.get_logger("upload")
-    load_dotenv()
     params = {
         "username": os.getenv("POSTGRES_USERNAME"),
         "password": os.getenv("POSTGRES_PASSWORD"),

@@ -6,13 +6,12 @@ Monitoring tool for Status App communities
 
 ## Environment Variables
 
-```
-POSTGRES_USERNAME
-POSTGRES_PASSWORD
-POSTGRES_DATABASE
-POSTGRES_HOST
-POSTGRES_PORT
-```
+- `POSTGRES_USERNAME` - Postgres username.
+- `POSTGRES_DATABASE` - The database name in the Postgres connection.
+- `POSTGRES_HOST` - The Postgres host name that will be remotely connected to.
+- `POSTGRES_PORT` - The Postgres port that will be remotely connected to.
+- `STATUS_BACKEND_BASE_URL` (**OPTIONAL**) - The Status Backend URL. If you are running locally you do not need this variable (`localhost` will be automatically set). If you are running it in a Docker container, please set it to `status-backend` (as the `container_name` of the `docker-compose.yaml`).
+
 
 ## Docker
 
@@ -27,6 +26,7 @@ docker login harbor.status.im
 ```bash
 docker compose up
 ```
+**Note**: If you want to run Status Backend only, just keep the `status-backend` key in [`services`](./docker-compose.yaml).
 
 ## Python
 1. Setup environment
@@ -39,6 +39,7 @@ conda create -n status-monitoring python=3.12
 ```bash
 pip install -r requirements.txt
 ```
+
 **Note**: If you are on Windows, you will have to install `psycopg2` instead of `psycopg2-binary`.
 
 ## Files

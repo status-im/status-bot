@@ -1,13 +1,36 @@
 ---
 services:
-  status-backend:
-    image: harbor.status.im/bi/status-backend:dev
-    container_name: status-backend
-    ports:
-      - 8080:8080
-      - 8545:8545
-      - 30303:30303
-    entrypoint: 'status-backend'
-    command: '-address 0.0.0.0:8080'
-    volumes:
-      - ./data-dir:/data-dir
+    status-backend:
+        image: harbor.status.im/bi/status-backend:dev
+        container_name: status-backend
+        ports:
+            - 8080:8080
+            - 8545:8545
+            - 30303:30303
+        entrypoint: 'status-backend'
+        command: '-address 0.0.0.0:8080'
+        volumes:
+            - ./data-dir:/data-dir
+        networks:
+            - status-bridge
+
+    status-monitor:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: message-processing
+        depends_on:
+            - status-backend
+        env_file:
+            - .env
+        environment:
+            STATUS_BACKEND_HOST: status-backend
+        volumes:
+            - ./accounts:/accounts
+        networks:
+            - status-bridge
+
+networks:
+    status-bridge:
+        name: status-bridge
+        driver: bridge
