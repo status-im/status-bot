@@ -1,8 +1,7 @@
 from clients.status_backend import StatusBackend
-from typing import Optional, Any
-import pandas as pd
+from typing import Any
 import constants, data_utils
-import os, datetime, pickle, time, json, logging
+import os, datetime, pickle, time, logging
 
 def save_pkl(file_path: str, data: Any):
     """
@@ -23,9 +22,6 @@ def run(logger: logging.Logger):
     message_folder = os.path.join(constants.UPLOAD_PATH, "messages")
     community_folder = os.path.join(constants.UPLOAD_PATH, "channel_info")
 
-    latest_batch_path = os.path.join(constants.UPLOAD_PATH, "start_timestamp.pkl")
-    start_timestamp: Optional[datetime.datetime] = pd.read_pickle(latest_batch_path) if os.path.exists(latest_batch_path) else None
-
     for channel_url in constants.CONFIG["status_app"]["channels"]:
         logger.info(f"Starting {channel_url}")
         community = data_utils.get_community_info(backend, channel_url)
@@ -36,31 +32,17 @@ def run(logger: logging.Logger):
 
         for channel in community["channels"]:
             msg = f"Downloading messages from {community['community_name']} #{channel['channel_name']}"
-            if start_timestamp:
-                msg += f" (from {start_timestamp} onwards)"
             logger.info(msg)
             params = {
                 "backend": backend,
                 "chat_id": channel["chat_id"],
                 "folder": message_folder,
-                "community_info": channel,
-                "start_timestamp": start_timestamp
+                "community_info": channel
             }
             data_utils.save_messages(**params)
 
     backend.logout()
     logger.info(f"Logged out of {constants.CONFIG['status_app']['bot_name']}")
-
-    timestamps = []
-    for file_name in os.listdir(message_folder):
-        with open(os.path.join(message_folder, file_name), "r") as f:
-            data: dict = json.load(f)
-        timestamps.append(data["metadata"]["latest_msg_timestamp"])
-
-    if not timestamps:
-        return
-
-    save_pkl(latest_batch_path, datetime.datetime.fromtimestamp(max(timestamps)))
 
 if __name__ == "__main__":
 
