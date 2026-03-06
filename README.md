@@ -43,6 +43,7 @@ To download and upload messages, please make sure you have set the following env
 - `POSTGRES_HOST`
 - `POSTGRES_PORT`
 - `STATUS_BACKEND_BASE_URL`
+- `STATUS_USERNAME` - required if `bot_name` is not provided in the [config](./config.yaml).
 
 ```bash
 docker compose --profile monitoring up
