@@ -8,9 +8,8 @@ class Signal:
     only with `/signals`
     """
 
-    # As of now signals should be kept internal until initial
-    # Python SDK scope is defined. Then the SignalType from the tests
-    # can be reused.
+    # As of now signals should be kept internal until initial Python SDK
+    # scope is defined. Then the SignalType from the tests can be reused.
     available_signals = [
         'messages.new', 'message.delivered', 'node.ready',
         'node.started', 'node.login', 'node.stopped'
@@ -152,7 +151,10 @@ class Account:
             4: "dismissed" # Request cancelled
         }
     }
-
+    __prefix_mapping = {
+        "messaging": "wakuext",
+        "urls": "sharedurls"
+    }
     def __init__(self, unix_folder: str = "./data-dir", domain: str = "localhost", port: int = 8080, is_secure: bool = False):
         """
         Work with your own Status App account
@@ -287,10 +289,10 @@ class Account:
             - sent request - when `contact_state` is `sent` and `external_contact_state` is `none`
             - received request - when `contact_state` is `received`
         """
-        data = self.__call_rpc("contacts")
+        data = self.__call_rpc("messaging", "contacts")
         raw: list[dict] = data.get("result", [])
         if not raw:
-            return []
+            return {}
 
         # dict format can be used in restricting functionality
         # such as - `send_message` and `remove_contact`
@@ -323,7 +325,7 @@ class Account:
         - Current number of community members
         - Current channels' names, descriptions and permissions
         """
-        data = self.__call_rpc("communities")
+        data = self.__call_rpc("messaging", "communities")
         raw: list[dict] = data.get("result", [])
         if not raw:
             return []
@@ -365,10 +367,6 @@ class Account:
         return communities
 
     @property
-    def signal(self) -> Signal:
-        return self.__signal
-
-    @property
     def chats(self) -> list[dict]:
         """
         All chats that the bot can send messages to.
@@ -400,7 +398,7 @@ class Account:
             "contentType": 1, # Send message only. Future versions can have different message types (audio, image, etc.)
             "responseTo": ""
         }]
-        self.__call_rpc("sendChatMessage", params)
+        self.__call_rpc("messaging", "sendChatMessage", params)
 
     def listen_messages(self) -> Generator:
         """
@@ -432,7 +430,7 @@ class Account:
 
         finished = False
         while not finished:
-            data = self.__call_rpc("chatMessages", list(params.values()))
+            data = self.__call_rpc("messaging", "chatMessages", list(params.values()))
             result: dict[str, Union[str, list[dict]]] = data.get("result", {})
             if result["messages"] and not timestamp_keys:
                 timestamp_keys = [key for key in result["messages"][0].keys() if "timestamp" in key.lower()]
@@ -477,10 +475,10 @@ class Account:
                 break
 
         if not display_name:
-            raise Exception(f"Cannot add contact {public_key}...\nPlease make sure you add display_name for contacts that you are sending friend requests to!")
+            raise Exception(f"Cannot add contact {public_key}...\nPlease make sure you add display_name for contacts that you are sending friend requests to and have never interacted with before!")
 
         params = [{"id": public_key, "nickname": "", "displayName": display_name, "ensName": ""}]
-        self.__call_rpc("addContact", params)
+        self.__call_rpc("messaging", "addContact", params)
 
     def remove_contact(self, public_key: str) -> bool:
         """
@@ -488,16 +486,47 @@ class Account:
 
         Parameters:
             - `public_key` - the contact's public key
+
+        Output:
+            - If `True` the user has been removed. If `False` the user has not been removed (either not a contact or not a friend)
         """
         contact_info = self.contacts.get(public_key, {})
         # Cannot remove a contact that is not in your contact
         if not contact_info:
-            return
+            return False
         # Contact has already been removed
         if contact_info["contact_state"] == "none":
-            return
+            return False
         params = [public_key]
-        self.__call_rpc("removeContact", params)
+        self.__call_rpc("messaging", "removeContact", params)
+        return True
+
+    def send_request_community(self, url: str) -> Optional[datetime.datetime]:
+        """
+        Send a request to join a community
+
+        Parameters:
+            - `url` - the community's URL
+
+        Output:
+            - the timestamp the request was sent
+        """
+        data = self.__call_rpc("urls", "parseSharedURL", [url])
+        raw: dict = data.get("result", {})
+        community_key = raw["community"]["communityId"]
+
+        params = [{"communityKey": community_key, "waitForResponse": True, "tryDatabase": True}]
+        data = self.__call_rpc("messaging", "fetchCommunity", params)
+        raw: dict = data.get("result", {})
+        community_id = raw["id"]
+
+        params = [{
+            "communityId": community_id,
+            "addressesToReveal": [self.info["wallet_address"]],
+            "airdropAddress": self.info["wallet_address"]
+        }]
+        data = self.__call_rpc("messaging", "requestToJoinCommunity", params)
+        return datetime.datetime.fromtimestamp(raw.get("requestedToJoinAt", datetime.datetime.now().timestamp()))
 
     def __start_messenger(self):
         """
@@ -506,7 +535,7 @@ class Account:
         """
         if self.__is_messenger_launched:
             return
-        self.__call_rpc("startMessenger")
+        self.__call_rpc("messaging", "startMessenger")
         self.__is_messenger_launched = True
 
     def __del__(self):
@@ -517,11 +546,18 @@ class Account:
         self.logout()
         self.__signal.close(None)
 
-    def __call_rpc(self, method_name: str, params: Optional[Union[list, dict]] = None) -> dict:
+    def call_rpc(self, prefix: str, method_name: str, params: Optional[Union[list, dict]] = None) -> dict:
+        """
+        For faster development purposes
+        """
+        return self.__call_rpc(prefix, method_name, params)
+
+    def __call_rpc(self, prefix: str, method_name: str, params: Optional[Union[list, dict]] = None) -> dict:
         """
         Make RPC calls to Status Backend
 
         Parameters:
+            - `prefix` - the prefix of the method name
             - `method_name` - the method name as it is in the backend
             - `params` - RPC call parameters
 
@@ -531,11 +567,14 @@ class Account:
         # Quick initialization check - RPC calls
         # can be made only after the user has logged in
         self.info
+        name = self.__prefix_mapping.get(prefix)
+        if not name:
+            raise Exception(f"Name {name} does not exist... Available options: {list(self.__prefix_mapping.keys())}")
 
         data = {
             'jsonrpc': '2.0',
             # NOTE: Waku may be renamed to Logos Messaging (or something similar)
-            'method': f'wakuext_{method_name}',
+            'method': f'{name}_{method_name}',
             'id': None # Original code has an incrementing ID but it does not make a difference
         }
         if params:
