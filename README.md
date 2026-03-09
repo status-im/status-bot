@@ -14,14 +14,6 @@ Monitoring tool for Status App communities
 - `STATUS_USERNAME` - The Status username that will be used to create an account. This is required if you are running **Dockerfile** for `create_account.py`.
 - `STATUS_PASSWORD` - The Status password that will be used to create an account. This is required if you are running **Dockerfile** for `create_account.py`.
 
-## Docker
-
-Login to `harbor.status.im`. Your password is your Harbor **CLI secret**.
-
-```bash
-docker login harbor.status.im
-```
-
 ### Account Creation
 
 To create an account, please make sure you have set the following environment variables:
