@@ -21,5 +21,5 @@ if len(__bot_name) == 0 and os.environ.get("STATUS_USERNAME"):
 
 STATUS_BACKEND_PARAMS = {
     **CONFIG["status_app"]["backend_params"],
-    "url": f"http:{'s' if CONFIG['status_app']['url']['is_https']  else ''}//{os.environ.get('STATUS_BACKEND_BASE_URL', 'localhost')}:{CONFIG['status_app']['url']['port']}"
+    "url": f"http{'s' if CONFIG['status_app']['url']['is_https']  else ''}://{os.environ.get('STATUS_BACKEND_BASE_URL', 'localhost')}:{CONFIG['status_app']['url']['port']}"
 }
