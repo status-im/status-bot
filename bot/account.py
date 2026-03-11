@@ -1,4 +1,4 @@
-from typing import Optional, Union, Generator
+from typing import Optional, Union, Generator, Any
 import requests, datetime, re
 from .signal import Signal
 
@@ -129,6 +129,7 @@ class Account:
             "compressed_key": event["compressedKey"],
             "mnemonic": event["mnemonic"],
             "display_name": event["display-name"],
+            "bio": event.get("bio", ""),
             "password": password,
             "wallet_address": event["address"],
             "logged_in_timestamp": datetime.datetime.now()
@@ -179,6 +180,35 @@ class Account:
         # after the name has been changed.
         self.signal.get("envelope.sent")
         self.__info["display_name"] = name
+
+    @property
+    def bio(self) -> str:
+        """
+        Get the current bio
+        """
+        return self.info["bio"]
+
+    @bio.setter
+    def bio(self, bio: Any):
+        if isinstance(bio, type(None)):
+            bio = ""
+
+        bio = str(bio).strip()
+        # Limit based from Status App
+        CHARACTERS = 240
+        if len(bio) > CHARACTERS:
+            raise ValueError(f"Bio cannot be longer than {CHARACTERS} characters...")
+
+        self.__call_rpc("messaging", "setBio", [bio])
+        # It seems that if a valid bio is given, it will be instantly updated
+        # However after tracing the signals, an `envelope.sent` is sent a bit
+        # after the bio has been updated.
+        self.signal.get("envelope.sent")
+        self.__info["bio"] = bio
+
+    @bio.deleter
+    def bio(self):
+        self.bio = ""
 
     @property
     def contacts(self) -> dict[str, dict]:

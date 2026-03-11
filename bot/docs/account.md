@@ -530,7 +530,7 @@ account.login(**params)
 print(account.display_name)
 ```
 
-You can also update the display name by assigning a new value:
+You can update the display name by assigning a new value:
 
 ```python
 from bot import Account
@@ -548,3 +548,58 @@ print(account.display_name)
 ```
 
 **Note**: Next time you login with the changed display name, you will have to put in the new display name, instead of the initial one.
+
+### `bio`
+
+Get or update the **bio** of the currently logged‑in account. The length of the bio (as in Status App) is 240 characters.
+
+Returns `str` when reading the property.
+
+```python
+from bot import Account
+
+account = Account()
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
+
+# Read the current bio
+print(account.bio)
+```
+
+The value assigned to `bio` will automatically be converted to a string before being sent to the backend. You can update the bio by assigning a new value:
+
+```python
+from bot import Account
+
+account = Account()
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
+
+# Update the bio
+account.bio = "Monitoring Status communities and chats"
+print(account.bio)
+```
+
+You can also **clear the bio** by deleting the property:
+
+```python
+from bot import Account
+
+account = Account()
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
+
+# Clears the bio - same as: 
+# account.bio = ""
+# account.bio = None
+del account.bio
+```
