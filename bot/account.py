@@ -57,26 +57,45 @@ class Account:
         if not isinstance(accounts, list):
             accounts = []
 
-        self.__available_accounts = {
-            account["name"]: {
+        self.__available_accounts = [
+            {
+                "display_name": account["name"],
                 "key_uid": account["key-uid"],
                 "created_at": datetime.datetime.fromtimestamp(account["timestamp"])
             }
             for account in accounts
-        }
+        ]
         # In case if there is a hanging logged in session
         self.logout()
 
-    def login(self, username: str, password: str):
+    def login(self, password: str, key_uid: Optional[str] = None, display_name: Optional[str] = None):
         """
         Login to the given account. If it does not exist,
         it will be created and automatically logged in.
 
         Parameters:
-            - `username` - your Status display name
             - `password` - your Status password
+            - `key_uid` - your key unique identifier. If not provided `display_name` will be used to fetch it. This means that each `display_name` can be linked to one `key_uid`
+            - `display_name` - your Status display name. Use `display_name` and `password` parameter combination if you have a 1 to 1 mapping (each display name has a unique `key_uid`)
         """
-        key_uid = self.__available_accounts.get(username, {}).get("key_uid")
+        if not key_uid and not display_name:
+            raise ValueError("Please provide either a Key Unique Identifier (key_uid) or a Display Name (display_name)...")
+
+        # Login combination: display_name + password
+        if not key_uid:
+            for account in self.__available_accounts:
+                if account["display_name"] != display_name:
+                    continue
+
+                key_uid = account["key_uid"]
+                break
+        # Login combination: key_uid + password
+        else:
+            available_key_uids = [current["key_uid"] for current in self.__available_accounts]
+            if key_uid not in available_key_uids:
+                info = "\n".join([f"{current['key_uid']} - {current['display_name']}" for current in self.__available_accounts])
+                raise ValueError(f"Given Key Unique Identifier is invalid...\nAvailable Key Unique Identifiers:\n{info}")
+
         is_new_account = isinstance(key_uid, type(None))
 
         params = {
@@ -85,10 +104,11 @@ class Account:
             'kdfIterations': self.__kd_iterations
         }
         if is_new_account:
+            self.__validate_display_name(display_name)
             params = {
                 "rootDataDir": self.__unix_folder,
                 "kdfIterations": self.__kd_iterations,
-                "displayName": username,
+                "displayName": display_name,
                 "password": password,
                 "customizationColor": "primary",
                 "wakuV2LightClient": False,
@@ -106,8 +126,9 @@ class Account:
             "public_key": event["public-key"],
             "emojis": event["emojiHash"],
             "key_uid": event["key-uid"],
+            "compressed_key": event["compressedKey"],
             "mnemonic": event["mnemonic"],
-            "name": event["display-name"],
+            "display_name": event["display-name"],
             "password": password,
             "wallet_address": event["address"],
             "logged_in_timestamp": datetime.datetime.now()
@@ -126,6 +147,13 @@ class Account:
         return self
 
     @property
+    def available_accounts(self) -> list[dict]:
+        """
+        All locally available accounts
+        """
+        return self.__available_accounts
+
+    @property
     def info(self) -> dict:
         """
         Overall information for currently logged in account.
@@ -134,6 +162,23 @@ class Account:
         if not self.__info:
             raise Exception("Make sure you are logged in to your Status account with login() first...")
         return self.__info
+
+    @property
+    def display_name(self) -> str:
+        """
+        Get the current display name
+        """
+        return self.info["display_name"]
+
+    @display_name.setter
+    def display_name(self, name: str):
+        self.__validate_display_name(name)
+        output = self.__call_rpc("messaging", "setDisplayName", [name])
+        # It seems that if a valid name is given, it will be instantly updated
+        # However after tracing the signals, an `envelope.sent` is sent a bit
+        # after the name has been changed.
+        self.signal.get("envelope.sent")
+        self.__info["display_name"] = name
 
     @property
     def contacts(self) -> dict[str, dict]:
@@ -347,7 +392,7 @@ class Account:
                 break
 
         if not display_name:
-            raise Exception(f"Cannot add contact {public_key}...\nPlease make sure you add display_name for contacts that you are sending friend requests to and have never interacted with before!")
+            raise ValueError(f"Cannot add contact {public_key}...\nPlease make sure you add display_name for contacts that you are sending friend requests to and have never interacted with before!")
 
         params = [{"id": public_key, "nickname": "", "displayName": display_name, "ensName": ""}]
         self.__call_rpc("messaging", "addContact", params)
@@ -442,7 +487,7 @@ class Account:
         self.info
         name = self.__prefix_mapping.get(prefix)
         if not name:
-            raise Exception(f"Name {name} does not exist... Available options: {list(self.__prefix_mapping.keys())}")
+            raise ValueError(f"Name {name} does not exist... Available options: {list(self.__prefix_mapping.keys())}")
 
         data = {
             'jsonrpc': '2.0',
@@ -471,3 +516,32 @@ class Account:
         s1 = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', name)
         s2 = re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', s1)
         return s2.lower()
+
+    def __validate_display_name(self, name: str) -> bool:
+        """
+        Validate the display name based on Status App rules.
+        Validation most probably is dealt with on the GUI side
+        of the application instead of the backend.
+
+        Status App validation rules:
+            - Use A-Z and 0-9, hyphens and underscores only
+            - Display name must be at least 5 characters long
+            - Display name can't start or end with a space
+
+        Parameters:
+            - `name` - the name that the user wants to use to login / create account / change
+
+        Output:
+            - `True` if the name was successfully changed. A
+        """
+        if name != name.strip():
+            raise ValueError("Display name cannot start or end with a space.")
+
+        if len(name) < 5:
+            raise ValueError("Display name must be at least 5 characters long.")
+
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", name):
+            raise ValueError("Display name can contain only A-Z, 0-9, hyphens (-), and underscores (_).")
+
+        return True
+

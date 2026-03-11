@@ -2,16 +2,55 @@
 
 The account class allows you to easily work with a Status account.
 
+## Display name
+
+The **display name** is the human‑readable identifier for a Status account. It is used when creating an account, resolving an existing account during [`login`](./account.md#loginpassword-key_uidnone-display_namenone), and when updating the account name through the [`display_name`](./account.md#display_name) property.
+
+Display names must follow strict validation rules enforced by the library and expected by the Status application. A valid display name must satisfy all of the following conditions:
+
+- It may contain **uppercase letters (`A–Z`)**
+- It may contain **numbers (`0–9`)**
+- It may contain **hyphens (`-`)**
+- It may contain **underscores (`_`)**
+- It must be **at least 5 characters long**
+- It **cannot start or end with a space**
+
+Characters such as spaces, punctuation, emojis, or other symbols are **not allowed**.
+
+### Valid examples
+
+```
+alpha_01
+STATUS-01
+bot_user_5
+HELLO123
+node-42
+```
+
+### Invalid examples
+
+| Example | Reason |
+|-------|--------|
+| `bot` | Too short (minimum length is 5) |
+| ` mybot` | Leading space |
+| `mybot ` | Trailing space |
+| `bot!123` | Contains invalid character `!` |
+| `bot user` | Spaces are not allowed |
+
+If a display name does not follow these rules, a **`ValueError`** will be raised by the account validation logic.
+
+
 ## Methods
 
-### `login(username, password)`
+### `login(password, key_uid=None, display_name=None)`
 
 Login to an existing Status account. If the account does not exist in the initialized data directory, a new account will be created and automatically logged in. After a successful login, the decentralized messenger service is automatically started so the account can send and receive messages.
 
 | Name | Type | Required | Description |
 |-----|-----|-----|-------------|
-| `username` | `str` | Yes | Display name of the Status account |
 | `password` | `str` | Yes | Password used to encrypt the account |
+| `key_uid` | `str` | Yes* | Unique key identifier of the account. If provided, the account will be logged in directly using this identifier. If not provided, then you must use `display_name` and `password` to login. |
+| `display_name` | `str` | Yes* | Display name of the account. Used to resolve the `key_uid` if it is not provided, or to create a new account if one does not already exist. |
 
 Returns the current `Account` instance, allowing method chaining.
 
@@ -19,7 +58,22 @@ Returns the current `Account` instance, allowing method chaining.
 from bot import Account
 
 account = Account()
-account.login("status-app-bot", "SNTPUMP")
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
+```
+
+```python
+from bot import Account
+
+account = Account()
+params = {
+    "key_uid": "0xff2c3...",
+    "password": "SNTPUMP"
+}
+account.login(**params)
 ```
 
 ### `logout()`
@@ -30,7 +84,11 @@ Logout from the currently logged-in Status account. This method also clears the 
 from bot import Account
 
 account = Account()
-account.login("status-app-bot", "SNTPUMP")
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
 
 # Optional - even if not specified __del__ will log you out
 account.logout()
@@ -54,7 +112,11 @@ Send a text message to a specific chat. This method currently supports **text me
 from bot import Account
 
 account = Account()
-account.login("status-app-bot", "SNTPUMP")
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
 
 # This is under the assumption you already have a contact / joined a community
 chat = account.chats[0]
@@ -82,7 +144,11 @@ from bot import Account
 import datetime
 
 account = Account()
-account.login("status-app-bot", "SNTPUMP")
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
 
 chat = account.chats[0]
 
@@ -109,7 +175,11 @@ from rich import print as rprint
 from rich.pretty import Pretty
 
 account = Account()
-account.login("status-app-bot", "SNTPUMP")
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
 
 for msg in account.listen_messages():
     rprint(Pretty(msg))
@@ -143,7 +213,11 @@ Returns the current `Account` instance, allowing method chaining.
 from bot import Account
 
 account = Account()
-account.login("status-app-bot", "SNTPUMP")
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
 
 # Send a contact request
 account.add_contact(
@@ -182,7 +256,11 @@ Returns `bool`.
 from bot import Account
 
 account = Account()
-account.login("status-app-bot", "SNTPUMP")
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
 
 # NOTE: contacts are returned as a dict for 
 # internal class checks and scalability
@@ -208,7 +286,11 @@ Returns `datetime.datetime` representing when the join request was submitted.
 from bot import Account
 
 account = Account()
-account.login("status-app-bot", "SNTPUMP")
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
 
 account.send_request_community(
     "https://status.app/c/community-invite-link"
@@ -217,6 +299,30 @@ account.send_request_community(
 
 
 ## Properties
+
+### `available_accounts`
+
+Returns all Status accounts that are **locally available** in the initialized data directory. These accounts are detected when the `Account` class is initialized.
+
+This property is useful when you want to:
+- inspect which accounts exist locally
+- retrieve a `key_uid` for login
+- display metadata about stored accounts
+
+**You will have to know the passwords for the given `key_uid`.**
+
+Returns `list[dict]`.
+
+```python
+from bot import Account
+# For terminal readability only
+from rich import print as rprint
+from rich.pretty import Pretty
+
+account = Account()
+
+rprint(Pretty(account.available_accounts))
+```
 
 ### `info`
 
@@ -227,8 +333,9 @@ Provides information about the currently logged-in account. If `login()` has not
 | `public_key` | `str` | Public key that uniquely identifies the account. |
 | `emojis` | `str` | Emoji hash associated with the account identity. |
 | `key_uid` | `str` | Internal Status key identifier for the account. |
+| `compressed_key` | `str` | The chat key as it is in Status App. |
 | `mnemonic` | `str` | Mnemonic phrase used to generate the account keys. |
-| `name` | `str` | Display name of the account. |
+| `display_name` | `str` | Display name of the account. |
 | `password` | `str` | Password used to encrypt the account locally. |
 | `wallet_address` | `str` | Ethereum wallet address associated with the account. |
 | `logged_in_timestamp` | `datetime.datetime` | Timestamp when the account successfully logged in. |
@@ -237,7 +344,11 @@ Provides information about the currently logged-in account. If `login()` has not
 from bot import Account
 
 account = Account()
-account.login("status-app-bot", "SNTPUMP")
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
 
 print(account.info)
 ```
@@ -279,7 +390,11 @@ Returns `dict[str, dict]` where the key is the contact's **public key**. This ma
 from bot import Account
 
 account = Account()
-account.login("status-app-bot", "SNTPUMP")
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
 
 contacts = account.contacts
 
@@ -368,7 +483,11 @@ Returns `list[dict]` where each `dict` represents a chat that can be used with [
 from bot import Account
 
 account = Account()
-account.login("status-app-bot", "SNTPUMP")
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
 
 # This is under the assumption you already have a contact / joined a community
 for chat in account.chats:
@@ -390,3 +509,42 @@ The property exposes two primary methods:
 
 - `signal.get()` — fetch a single event. If the event is not found, you may end up in an infinite loop.
 - `signal.listen()` — stream events continuously. Example usage of this is found in [`listen_messages()`](./account.md#listen_messages)
+
+### `display_name`
+
+Get or update the current display name of the logged‑in account.
+
+Returns `str` when reading the property.
+
+```python
+from bot import Account
+
+account = Account()
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
+
+# Get the current display name
+print(account.display_name)
+```
+
+You can also update the display name by assigning a new value:
+
+```python
+from bot import Account
+
+account = Account()
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
+
+# Change the display name
+account.name = "status_bot_42"
+print(account.display_name)
+```
+
+**Note**: Next time you login with the changed display name, you will have to put in the new display name, instead of the initial one.
