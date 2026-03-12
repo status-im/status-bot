@@ -42,18 +42,22 @@ If a display name does not follow these rules, a **`ValueError`** will be raised
 
 ## Methods
 
-### `login(password, key_uid=None, display_name=None)`
+### `login(password, key_uid=None, display_name=None, mnemonic=None)`
 
 Login to an existing Status account. If the account does not exist in the initialized data directory, a new account will be created and automatically logged in. After a successful login, the decentralized messenger service is automatically started so the account can send and receive messages.
+
+An account can also be recovered if the `mnemonic` is passed.
 
 | Name | Type | Required | Description |
 |-----|-----|-----|-------------|
 | `password` | `str` | Yes | Password used to encrypt the account |
 | `key_uid` | `str` | Yes* | Unique key identifier of the account. If provided, the account will be logged in directly using this identifier. If not provided, then you must use `display_name` and `password` to login. |
-| `display_name` | `str` | Yes* | Display name of the account. Used to resolve the `key_uid` if it is not provided, or to create a new account if one does not already exist. |
+| `display_name` | `str` | Yes* | Display name of the account. Used to resolve the `key_uid` if it is not provided, or to create a new account if one does not already exist. This field is required if an account needs to be recovered with `mnemonic`. |
+| `mnemonic` | `str` | No | The mnemonic from [`info`](./account.md#info). Use this field with `password` and `display_name` to recover the account.<br>**Note**: You can pass a different `display_name` but that will be internal only. When an account is recovered setting [`display_name`](./account.md#display_name) can be buggy. Ideally when recovering the account, use the original `display_name` of the account. |
 
 Returns the current `Account` instance, allowing method chaining.
 
+Login with `display_name`:
 ```python
 from bot import Account
 
@@ -65,6 +69,9 @@ params = {
 account.login(**params)
 ```
 
+**Note**: This assumes that `display_name` and is unique for every `key_uid`. If there are duplicated `display_names` then the first found match will be used. You can log in with `key_uid` if you have `display_name` duplicates.
+
+Login with `key_uid`:
 ```python
 from bot import Account
 
@@ -72,6 +79,20 @@ account = Account()
 params = {
     "key_uid": "0xff2c3...",
     "password": "SNTPUMP"
+}
+account.login(**params)
+```
+
+Recover account:
+
+```python
+from bot import Account
+
+account = Account()
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP",
+    "mnemonic" : "phrase_1 phrase_2 phrase_3 phrase_4 phrase_5 phrase_6 phrase_7 phrase_8 phrase_9 phrase_10 phrase_11 phrase_12"
 }
 account.login(**params)
 ```

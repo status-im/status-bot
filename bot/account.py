@@ -41,6 +41,7 @@ class Account:
                 "initialize": f"{self.http_base_url}InitializeApplication",
                 "login": f"{self.http_base_url}LoginAccount",
                 "create": f"{self.http_base_url}CreateAccountAndLogin",
+                "restore": f"{self.http_base_url}RestoreAccountAndLogin",
                 "logout": f"{self.http_base_url}Logout",
                 "rpc": f"{self.http_base_url}CallRPC"
             },
@@ -49,26 +50,12 @@ class Account:
             }
         }
         self.__signal = Signal(self.urls["socket"]["signals"])
-        response = requests.post(self.urls["http"]["initialize"], json={
-            "dataDir": self.__unix_folder
-        })
-        data: dict = response.json()
-        accounts: list[dict] = data.get("accounts", [])
-        if not isinstance(accounts, list):
-            accounts = []
-
-        self.__available_accounts = [
-            {
-                "display_name": account["name"],
-                "key_uid": account["key-uid"],
-                "created_at": datetime.datetime.fromtimestamp(account["timestamp"])
-            }
-            for account in accounts
-        ]
+        # Initialize profile
+        self.available_accounts
         # In case if there is a hanging logged in session
         self.logout()
 
-    def login(self, password: str, key_uid: Optional[str] = None, display_name: Optional[str] = None):
+    def login(self, password: str, key_uid: Optional[str] = None, display_name: Optional[str] = None, mnemonic: Optional[str] = None):
         """
         Login to the given account. If it does not exist,
         it will be created and automatically logged in.
@@ -77,13 +64,15 @@ class Account:
             - `password` - your Status password
             - `key_uid` - your key unique identifier. If not provided `display_name` will be used to fetch it. This means that each `display_name` can be linked to one `key_uid`
             - `display_name` - your Status display name. Use `display_name` and `password` parameter combination if you have a 1 to 1 mapping (each display name has a unique `key_uid`)
+            - `mnemonic` - the mnemonic when creating an account. Use this field with `password` and `display_name` to recover an account
         """
         if not key_uid and not display_name:
             raise ValueError("Please provide either a Key Unique Identifier (key_uid) or a Display Name (display_name)...")
 
+        available_accounts = self.available_accounts
         # Login combination: display_name + password
         if not key_uid:
-            for account in self.__available_accounts:
+            for account in available_accounts:
                 if account["display_name"] != display_name:
                     continue
 
@@ -91,19 +80,34 @@ class Account:
                 break
         # Login combination: key_uid + password
         else:
-            available_key_uids = [current["key_uid"] for current in self.__available_accounts]
+            available_key_uids = [current["key_uid"] for current in available_accounts]
             if key_uid not in available_key_uids:
                 info = "\n".join([f"{current['key_uid']} - {current['display_name']}" for current in self.__available_accounts])
                 raise ValueError(f"Given Key Unique Identifier is invalid...\nAvailable Key Unique Identifiers:\n{info}")
 
         is_new_account = isinstance(key_uid, type(None))
+        is_recovery = not isinstance(mnemonic, type(None))
 
+        url_key = "login"
         params = {
             "keyUid": key_uid,
             "password": password,
             'kdfIterations': self.__kd_iterations
         }
-        if is_new_account:
+        if is_recovery:
+            self.__validate_display_name(display_name)
+            params = {
+                "mnemonic": mnemonic,
+                "rootDataDir": self.__unix_folder,
+                "kdfIterations": self.__kd_iterations,
+                "displayName": display_name,
+                "password": password,
+                "customizationColor": "primary",
+                "wakuV2LightClient": False,
+                "thirdpartyServicesEnabled": True
+            }
+            url_key = "restore"
+        elif is_new_account:
             self.__validate_display_name(display_name)
             params = {
                 "rootDataDir": self.__unix_folder,
@@ -114,8 +118,10 @@ class Account:
                 "wakuV2LightClient": False,
                 "thirdpartyServicesEnabled": True,
             }
+            url_key = "create"
+
         self.logout()
-        url = self.urls["http"]["login" if not is_new_account else "create"]
+        url = self.urls["http"][url_key]
         response = requests.post(url, json=params)
         signal_event = self.__signal.get("node.login")
         if signal_event["is_error"]:
@@ -127,7 +133,7 @@ class Account:
             "emojis": event["emojiHash"],
             "key_uid": event["key-uid"],
             "compressed_key": event["compressedKey"],
-            "mnemonic": event["mnemonic"],
+            "mnemonic": event.get("mnemonic", mnemonic),
             "display_name": event["display-name"],
             "bio": event.get("bio", ""),
             "password": password,
@@ -152,7 +158,23 @@ class Account:
         """
         All locally available accounts
         """
-        return self.__available_accounts
+        response = requests.post(self.urls["http"]["initialize"], json={
+            "dataDir": self.__unix_folder
+        })
+        data: dict = response.json()
+        accounts: list[dict] = data.get("accounts", [])
+        if not isinstance(accounts, list):
+            accounts = []
+
+        current_available_accounts = [
+            {
+                "display_name": account["name"],
+                "key_uid": account["key-uid"],
+                "created_at": datetime.datetime.fromtimestamp(account["timestamp"])
+            }
+            for account in accounts
+        ]
+        return current_available_accounts
 
     @property
     def info(self) -> dict:
@@ -484,6 +506,7 @@ class Account:
         if self.__is_messenger_launched:
             return
         self.__call_rpc("messaging", "startMessenger")
+        self.__signal.get("wakuv2.peerstats")
         self.__is_messenger_launched = True
 
     def __del__(self):
