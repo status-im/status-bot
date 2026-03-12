@@ -13,6 +13,7 @@ Display names must follow strict validation rules enforced by the library and ex
 - It may contain **hyphens (`-`)**
 - It may contain **underscores (`_`)**
 - It must be **at least 5 characters long**
+- It **cannot be more than 24 characters long**
 - It **cannot start or end with a space**
 
 Characters such as spaces, punctuation, emojis, or other symbols are **not allowed**.
@@ -96,6 +97,10 @@ params = {
 }
 account.login(**params)
 ```
+
+**Note**: When in recovery mode, the display name is updated on Status App as well so it is consistent locally and to other users.
+
+
 
 ### `logout()`
 
@@ -623,4 +628,28 @@ account.login(**params)
 # account.bio = ""
 # account.bio = None
 del account.bio
+```
+
+### `logger`
+
+Provides access to the internal **Python logger** for monitoring the lifecycle of the account and backend operations such as login, account creation, messenger startup, and recovery.
+
+Returns `logging.Logger`.
+
+Default logger configuration:
+
+- **Name**: `status-bot`
+- **Level**: `INFO`
+- **Output**: standard output (terminal)
+
+Example:
+
+```python
+from bot import Account
+
+account = Account()
+
+account.logger.info("Starting Status bot")
+account.logger.warning("This is a warning")
+account.logger.error("Something went wrong")
 ```

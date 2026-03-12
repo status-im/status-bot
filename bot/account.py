@@ -1,7 +1,7 @@
 from typing import Optional, Union, Generator, Any
-import requests, datetime, re
+import requests, datetime, re, logging
 from .signal import Signal
-
+from .logger import Logger
 class Account:
 
     # Enum mappings from original wakuext.py
@@ -28,6 +28,7 @@ class Account:
             - `port` - the port to connect to Status Backend. Verify the port in the Docker files.
             - `is_secure` - if `http` or `https` should be used
         """
+        self.__logger = Logger()
         self.__timestamp_divisor = 1_000
         self.__kd_iterations = 256000
         self.__unix_folder = unix_folder
@@ -86,7 +87,7 @@ class Account:
                 raise ValueError(f"Given Key Unique Identifier is invalid...\nAvailable Key Unique Identifiers:\n{info}")
 
         is_new_account = isinstance(key_uid, type(None))
-        is_recovery = not isinstance(mnemonic, type(None))
+        is_recovery = not isinstance(mnemonic, type(None)) and not key_uid
 
         url_key = "login"
         params = {
@@ -107,6 +108,7 @@ class Account:
                 "thirdpartyServicesEnabled": True
             }
             url_key = "restore"
+            self.logger.info(f"Restoring account for given mnemonics")
         elif is_new_account:
             self.__validate_display_name(display_name)
             params = {
@@ -119,6 +121,9 @@ class Account:
                 "thirdpartyServicesEnabled": True,
             }
             url_key = "create"
+            self.logger.info(f"Creating account with display_name {display_name}")
+        else:
+            self.logger.info(f"Logging in with Key UID - {key_uid}")
 
         self.logout()
         url = self.urls["http"][url_key]
@@ -127,6 +132,7 @@ class Account:
         if signal_event["is_error"]:
             raise Exception(f"There was an error with Status Backend...\n{signal_event['error_message']}")
 
+        self.logger.info("Successfully logged in!")
         event: dict = signal_event["event"]["settings"]
         self.__info = {
             "public_key": event["public-key"],
@@ -142,6 +148,9 @@ class Account:
         }
         # Messenger can be activated only when logged in
         self.__start_messenger()
+        if is_recovery:
+            self.display_name = event["display-name"]
+
         return self
 
     def logout(self):
@@ -152,6 +161,10 @@ class Account:
         self.__info = {}
         self.__is_messenger_launched = False
         return self
+
+    @property
+    def logger(self) -> logging.Logger:
+        return self.__logger
 
     @property
     def available_accounts(self) -> list[dict]:
@@ -505,9 +518,11 @@ class Account:
         """
         if self.__is_messenger_launched:
             return
+        self.logger.info("Starting messaging")
         self.__call_rpc("messaging", "startMessenger")
         self.__signal.get("wakuv2.peerstats")
         self.__is_messenger_launched = True
+        self.logger.info("Messaging launched")
 
     def __del__(self):
         """
@@ -592,6 +607,9 @@ class Account:
 
         if len(name) < 5:
             raise ValueError("Display name must be at least 5 characters long.")
+
+        if len(name) > 24:
+            raise ValueError("Display name cannot be more than 24 characters long.")
 
         if not re.fullmatch(r"[A-Za-z0-9_-]+", name):
             raise ValueError("Display name can contain only A-Z, 0-9, hyphens (-), and underscores (_).")
