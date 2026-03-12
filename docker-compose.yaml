@@ -20,8 +20,9 @@ services:
     status-account-creation:
         build:
             context: .
-            dockerfile: Dockerfile.account_creation
+            dockerfile: Dockerfile
         container_name: account-creation
+        command: 'python create_account.py'
         depends_on:
             - status-backend
         env_file:
@@ -35,7 +36,7 @@ services:
     status-monitor:
         build:
             context: .
-            dockerfile: Dockerfile.monitoring
+            dockerfile: Dockerfile
         container_name: message-processing
         depends_on:
             - status-backend
