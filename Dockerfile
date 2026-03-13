@@ -11,4 +11,7 @@ RUN rm -rf data-dir
 # In case if the scripts are ran locally instead of with Docker
 RUN rm -rf uploads
 
-CMD ["sh", "-c", "python upload.py & python download.py"]
+RUN chmod +x entrypoint.sh
+
+ENTRYPOINT ["bash", "/app/entrypoint.sh"]
+CMD []

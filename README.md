@@ -7,6 +7,7 @@ Monitoring tool for Status App communities
 ## Environment Variables
 
 - `POSTGRES_USERNAME` - Postgres username.
+- `POSTGRES_PASSWORD` - Postgres password.
 - `POSTGRES_DATABASE` - The database name in the Postgres connection.
 - `POSTGRES_HOST` - The Postgres host name that will be remotely connected to.
 - `POSTGRES_PORT` - The Postgres port that will be remotely connected to.
@@ -14,39 +15,33 @@ Monitoring tool for Status App communities
 - `STATUS_USERNAME` - The Status username that will be used to create an account. This is required if you are running **Dockerfile** for `create_account.py`.
 - `STATUS_PASSWORD` - The Status password that will be used to create an account. This is required if you are running **Dockerfile** for `create_account.py`.
 
-### Account Creation
+## Docker deployement
 
-To create an account, please make sure you have set the following environment variables:
+You can use the `docker-compose.yaml` to run the project.
 
-- `STATUS_BACKEND_BASE_URL`
-- `STATUS_USERNAME`
-- `STATUS_PASSWORD`
-
-```bash
-docker compose --profile account-creation up
+Example of `.env` file to use
+```
+# Status Backend connection
+STATUS_BACKEND_BASE_URL=status-backend
+STATUS_USERNAME=bot-status
+STATUS_PASSWORD=ChangeThisPassword
+INIT_ACCOUNT=true
+# Database config
+POSTGRES_HOST=database
+POSTGRES_PORT=5432
+POSTGRES_DATABASE=status-bot
+POSTGRES_USERNAME=status
+POSTGRES_PASSWORD=ChangeThisOneAlso
 ```
 
-### Monitoring
-
-To download and upload messages, please make sure you have set the following environment variables:
-
-- `POSTGRES_USERNAME`
-- `POSTGRES_DATABASE`
-- `POSTGRES_HOST`
-- `POSTGRES_PORT`
-- `STATUS_BACKEND_BASE_URL`
-- `STATUS_USERNAME` - required if `bot_name` is not provided in the [config](./config.yaml).
-
-```bash
-docker compose --profile monitoring up
-```
+` INIT_ACCOUNT=true` will create a new account, if set to false, it will the credentials in the `accounts/ ` directory.
 
 ### Status Backend
 
 Run Backend independently so you can develop and test locally.
 
 ```bash
-docker compose --profile backend up
+docker compose run status-backend up -d
 ```
 
 ## Python

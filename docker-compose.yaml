@@ -1,6 +1,6 @@
 ---
 services:
-    status-backend:
+    backend:
         image: harbor.status.im/bi/status-backend:dev
         container_name: status-backend
         ports:
@@ -13,45 +13,42 @@ services:
             - ./backups:/root/.config/Status/backups
         networks:
             - status-bridge
-        profiles:
+        healthcheck:
+            test: ["CMD", "curl http://0.0.0.0:8080/health"]
+
+    bot:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: status-monitor
+        depends_on:
             - backend
-            - monitoring
-            - account-creation
-    status-account-creation:
-        build:
-            context: .
-            dockerfile: Dockerfile
-        container_name: account-creation
-        command: 'python create_account.py'
-        depends_on:
-            - status-backend
-        env_file:
-            - .env
+            - database
         volumes:
             - ./accounts:/app/accounts
-        networks:
-            - status-bridge
-        profiles:
-            - account-creation
-    status-monitor:
-        build:
-            context: .
-            dockerfile: Dockerfile
-        container_name: message-processing
-        depends_on:
-            - status-backend
         env_file:
             - .env
-        environment:
-            STATUS_BACKEND_HOST: status-backend
-        volumes:
-            - ./accounts:/app/accounts
-        profiles:
-            - monitoring
         networks:
             - status-bridge
+
+    database:
+        image: postgres:15
+        container_name: database
+        env_file:
+            - .env
+        ports:
+            - 5432:5432
+        volumes:
+            - postgres-data:/var/lib/postgresql
+        networks:
+            - status-bridge
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready POSTGRES_USERNAME --dbname POSTGRES_DATABASE"]
 
 networks:
     status-bridge:
         name: status-bridge
         driver: bridge
+
+volumes:
+    postgres-data:
