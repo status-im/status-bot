@@ -1,5 +1,5 @@
 from typing import Optional
-import datetime, websocket, json, copy,queue, threading
+import datetime, websocket, json, copy, queue, threading
 
 class Signal:
     """
