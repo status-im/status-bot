@@ -211,8 +211,10 @@ __marimo__/
 .vscode/
 *.json
 *.ipynb
-/data-dir
 /uploads
 *.DS_Store
 *.pkl
 *.dockerignore
+# Docker volumes for Status
+/data-dir
+*.bkp

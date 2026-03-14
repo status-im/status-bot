@@ -10,7 +10,7 @@ services:
         entrypoint: 'status-backend'
         command: '-address 0.0.0.0:8080'
         volumes:
-            - ./data-dir:/data-dir
+            - ./backups:/root/.config/Status/backups
         networks:
             - status-bridge
         profiles:

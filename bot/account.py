@@ -1,7 +1,7 @@
 from typing import Optional, Union, Generator, Any
-import requests, datetime, re
+import requests, datetime, re, logging, os
 from .signal import Signal
-
+from .logger import Logger
 class Account:
 
     # Enum mappings from original wakuext.py
@@ -18,19 +18,25 @@ class Account:
         "messaging": "wakuext",
         "urls": "sharedurls"
     }
-    def __init__(self, unix_folder: str = "./data-dir", domain: str = "localhost", port: int = 8080, is_secure: bool = False):
+    def __init__(self, domain: str = "localhost", port: int = 8080, is_secure: bool = False):
         """
         Work with your own Status App account
 
         Parameters:
-            - `unix_folder` - where Status Backend files will be initialized. **This folder is required in the Docker container**. Ideally it should be a volume so the account data is persistant if the image is deleted. Folder path is automatically created.
             - `domain` - the domain name where Status Backend is running. If running locally it would be `localhost` and if it's running in a container it would be the image's name.
             - `port` - the port to connect to Status Backend. Verify the port in the Docker files.
             - `is_secure` - if `http` or `https` should be used
         """
+        # Path of the account data in the Docker container for Status Backend
+        self.__docker_data_folder = "./data-dir"
+        # Path of the backups in the Docker container for Status Backend
+        self.__docker_backup_folder = "./root/.config/Status/backups"
+        # As the docker-compose.yaml folder is at the moment
+        # NOTE: This might change for initial release
+        self.__backup_local_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), "backups")
+        self.__logger = Logger()
         self.__timestamp_divisor = 1_000
         self.__kd_iterations = 256000
-        self.__unix_folder = unix_folder
         self.__is_messenger_launched = False
         # Information for the logged in account
         self.__info = {}
@@ -41,34 +47,23 @@ class Account:
                 "initialize": f"{self.http_base_url}InitializeApplication",
                 "login": f"{self.http_base_url}LoginAccount",
                 "create": f"{self.http_base_url}CreateAccountAndLogin",
+                "restore": f"{self.http_base_url}RestoreAccountAndLogin",
                 "logout": f"{self.http_base_url}Logout",
-                "rpc": f"{self.http_base_url}CallRPC"
+                "create_backup": f"{self.http_base_url}PerformLocalBackup",
+                "load_backup": f"{self.http_base_url}LoadLocalBackup",
+                "rpc": f"{self.http_base_url}CallRPC",
             },
             "socket": {
                 "signals": f"{self.ws_base_url}signals"
             }
         }
         self.__signal = Signal(self.urls["socket"]["signals"])
-        response = requests.post(self.urls["http"]["initialize"], json={
-            "dataDir": self.__unix_folder
-        })
-        data: dict = response.json()
-        accounts: list[dict] = data.get("accounts", [])
-        if not isinstance(accounts, list):
-            accounts = []
-
-        self.__available_accounts = [
-            {
-                "display_name": account["name"],
-                "key_uid": account["key-uid"],
-                "created_at": datetime.datetime.fromtimestamp(account["timestamp"])
-            }
-            for account in accounts
-        ]
+        # Initialize profile
+        self.available_accounts
         # In case if there is a hanging logged in session
         self.logout()
 
-    def login(self, password: str, key_uid: Optional[str] = None, display_name: Optional[str] = None):
+    def login(self, password: str, key_uid: Optional[str] = None, display_name: Optional[str] = None, mnemonic: Optional[str] = None):
         """
         Login to the given account. If it does not exist,
         it will be created and automatically logged in.
@@ -77,13 +72,15 @@ class Account:
             - `password` - your Status password
             - `key_uid` - your key unique identifier. If not provided `display_name` will be used to fetch it. This means that each `display_name` can be linked to one `key_uid`
             - `display_name` - your Status display name. Use `display_name` and `password` parameter combination if you have a 1 to 1 mapping (each display name has a unique `key_uid`)
+            - `mnemonic` - the mnemonic when creating an account. Use this field with `password` and `display_name` to recover an account
         """
         if not key_uid and not display_name:
             raise ValueError("Please provide either a Key Unique Identifier (key_uid) or a Display Name (display_name)...")
 
+        available_accounts = self.available_accounts
         # Login combination: display_name + password
         if not key_uid:
-            for account in self.__available_accounts:
+            for account in available_accounts:
                 if account["display_name"] != display_name:
                     continue
 
@@ -91,22 +88,38 @@ class Account:
                 break
         # Login combination: key_uid + password
         else:
-            available_key_uids = [current["key_uid"] for current in self.__available_accounts]
+            available_key_uids = [current["key_uid"] for current in available_accounts]
             if key_uid not in available_key_uids:
                 info = "\n".join([f"{current['key_uid']} - {current['display_name']}" for current in self.__available_accounts])
                 raise ValueError(f"Given Key Unique Identifier is invalid...\nAvailable Key Unique Identifiers:\n{info}")
 
         is_new_account = isinstance(key_uid, type(None))
+        is_recovery = not isinstance(mnemonic, type(None)) and not key_uid
 
+        url_key = "login"
         params = {
             "keyUid": key_uid,
             "password": password,
             'kdfIterations': self.__kd_iterations
         }
-        if is_new_account:
+        if is_recovery:
             self.__validate_display_name(display_name)
             params = {
-                "rootDataDir": self.__unix_folder,
+                "mnemonic": mnemonic,
+                "rootDataDir": self.__docker_data_folder,
+                "kdfIterations": self.__kd_iterations,
+                "displayName": display_name,
+                "password": password,
+                "customizationColor": "primary",
+                "wakuV2LightClient": False,
+                "thirdpartyServicesEnabled": True
+            }
+            url_key = "restore"
+            self.logger.info(f"Restoring account for given mnemonics")
+        elif is_new_account:
+            self.__validate_display_name(display_name)
+            params = {
+                "rootDataDir": self.__docker_data_folder,
                 "kdfIterations": self.__kd_iterations,
                 "displayName": display_name,
                 "password": password,
@@ -114,20 +127,26 @@ class Account:
                 "wakuV2LightClient": False,
                 "thirdpartyServicesEnabled": True,
             }
+            url_key = "create"
+            self.logger.info(f"Creating account with display_name {display_name}")
+        else:
+            self.logger.info(f"Logging in with Key UID - {key_uid}")
+
         self.logout()
-        url = self.urls["http"]["login" if not is_new_account else "create"]
+        url = self.urls["http"][url_key]
         response = requests.post(url, json=params)
         signal_event = self.__signal.get("node.login")
         if signal_event["is_error"]:
             raise Exception(f"There was an error with Status Backend...\n{signal_event['error_message']}")
 
+        self.logger.info("Successfully logged in!")
         event: dict = signal_event["event"]["settings"]
         self.__info = {
             "public_key": event["public-key"],
             "emojis": event["emojiHash"],
             "key_uid": event["key-uid"],
             "compressed_key": event["compressedKey"],
-            "mnemonic": event["mnemonic"],
+            "mnemonic": event.get("mnemonic", mnemonic),
             "display_name": event["display-name"],
             "bio": event.get("bio", ""),
             "password": password,
@@ -136,6 +155,12 @@ class Account:
         }
         # Messenger can be activated only when logged in
         self.__start_messenger()
+        if is_recovery:
+            self.logger.info("Updating remote display name")
+            self.display_name = event["display-name"]
+            self.logger.info("Successfully updated display name!")
+            self.__load_backup()
+
         return self
 
     def logout(self):
@@ -148,11 +173,31 @@ class Account:
         return self
 
     @property
+    def logger(self) -> logging.Logger:
+        return self.__logger
+
+    @property
     def available_accounts(self) -> list[dict]:
         """
         All locally available accounts
         """
-        return self.__available_accounts
+        response = requests.post(self.urls["http"]["initialize"], json={
+            "dataDir": self.__docker_data_folder
+        })
+        data: dict = response.json()
+        accounts: list[dict] = data.get("accounts", [])
+        if not isinstance(accounts, list):
+            accounts = []
+
+        current_available_accounts = [
+            {
+                "display_name": account["name"],
+                "key_uid": account["key-uid"],
+                "created_at": datetime.datetime.fromtimestamp(account["timestamp"])
+            }
+            for account in accounts
+        ]
+        return current_available_accounts
 
     @property
     def info(self) -> dict:
@@ -330,7 +375,19 @@ class Account:
             {"type": "contact", "id": contact["chat_id"], "name": contact["display_name"]}
             for contact in self.contacts.values()
         ]
-        return contacts + communities
+
+        # Group chats in RPC endpoint are chat type 3
+        data = self.__call_rpc("messaging", "activeChats")
+        result: Optional[list[dict]] = data.get("result", [])
+        if not result:
+            result = []
+
+        group_chats = [
+            {"type": "group_chat", "id": active_chat["id"], "name": active_chat["name"]}
+            for active_chat in result
+            if active_chat["chatType"] == 3
+        ]
+        return contacts + communities + group_chats
 
     def send_message(self, chat_id: str, message: str):
         """
@@ -379,10 +436,17 @@ class Account:
         while not finished:
             data = self.__call_rpc("messaging", "chatMessages", list(params.values()))
             result: dict[str, Union[str, list[dict]]] = data.get("result", {})
-            if result["messages"] and not timestamp_keys:
+            messages: Optional[list[dict]] = result.get("messages")
+            cursor: Optional[str] = result.get("cursor")
+            if not cursor:
+                cursor = ""
+            if not messages:
+                messages = []
+
+            if messages and not timestamp_keys:
                 timestamp_keys = [key for key in result["messages"][0].keys() if "timestamp" in key.lower()]
 
-            for message in result["messages"]:
+            for message in messages:
                 point = {
                     self.__camel_to_snake(key): value if key not in timestamp_keys else datetime.datetime.fromtimestamp(value / self.__timestamp_divisor)
                     for key, value in message.items()
@@ -397,8 +461,8 @@ class Account:
 
                 all_messages.append(point)
 
-            if len(result["cursor"]) > 0:
-                params["cursor"] = result["cursor"]
+            if len(cursor) > 0:
+                params["cursor"] = cursor
             else:
                 finished = True
 
@@ -476,6 +540,23 @@ class Account:
         data = self.__call_rpc("messaging", "requestToJoinCommunity", params)
         return datetime.datetime.fromtimestamp(raw.get("requestedToJoinAt", datetime.datetime.now().timestamp()))
 
+    def backup(self) -> str:
+        """
+        Create a `.bkp` (Backup) for the account. If the backup was not successful, a custom exception will be raised.
+
+        Output:
+            - the Docker backup path (linked to a volume). The file name is unique per account.
+        """
+        self.info
+        response = requests.post(self.urls["http"]["create_backup"])
+        result: dict = response.json()
+        file_path = result.get("filePath")
+
+        if not file_path or (isinstance(file_path, str) and len(file_path) == 0):
+            raise Exception(f"There was an error with creating a backup for {self.info['display_name']}")
+
+        return file_path
+
     def __start_messenger(self):
         """
         Start the decentralized messaging service.
@@ -483,8 +564,11 @@ class Account:
         """
         if self.__is_messenger_launched:
             return
+        self.logger.info("Starting messaging")
         self.__call_rpc("messaging", "startMessenger")
+        self.__signal.get("wakuv2.peerstats")
         self.__is_messenger_launched = True
+        self.logger.info("Messaging launched")
 
     def __del__(self):
         """
@@ -499,6 +583,25 @@ class Account:
         For faster development purposes
         """
         return self.__call_rpc(prefix, method_name, params)
+
+    def __load_backup(self):
+        """
+        Try to load every file in the Docker volume
+        when an account recover is done.
+        """
+        for file_name in os.listdir(self.__backup_local_folder):
+            params = {
+                "filePath": os.path.join(self.__docker_backup_folder, file_name)
+            }
+            self.logger.info(f"Trying to load {file_name}")
+            response = requests.post(self.urls["http"]["load_backup"], json=params)
+            error: str = response.json().get("error", "")
+            if len(error) == 0:
+                self.__signal.get("history.request.completed")
+                self.logger.info(f"Successfully loaded file!")
+                break
+
+            self.logger.warning(error)
 
     def __call_rpc(self, prefix: str, method_name: str, params: Optional[Union[list, dict]] = None) -> dict:
         """
@@ -570,8 +673,10 @@ class Account:
         if len(name) < 5:
             raise ValueError("Display name must be at least 5 characters long.")
 
+        if len(name) > 24:
+            raise ValueError("Display name cannot be more than 24 characters long.")
+
         if not re.fullmatch(r"[A-Za-z0-9_-]+", name):
             raise ValueError("Display name can contain only A-Z, 0-9, hyphens (-), and underscores (_).")
 
         return True
-
