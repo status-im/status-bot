@@ -496,12 +496,13 @@ for community in account.communities:
 Get all chats that the account can **send messages to**. This includes:
 - [`contacts`](./account.md#contacts) — direct messages with users
 - [`communities`](./account.md#communities) — community channels where the account has **posting permission**
+- Group chats that the account is in
 
 Returns `list[dict]` where each `dict` represents a chat that can be used with [`send_message`](./account.md#send_messagechat_id-message) and [`get_messages`](./account.md#get_messageschat_id-start_timestampnone-end_timestampnone).
 
 | Key | Type | Description |
 |----|----|-------------|
-| `type` | `str` | Type of chat (`contact` or `channel`). |
+| `type` | `str` | Type of chat (`contact`, `channel` or `group_chat`). |
 | `id` | `str` | Chat identifier used when sending messages. |
 | `name` | `str` | Either the display name of the user or the community channel name. |
 

@@ -365,7 +365,15 @@ class Account:
             {"type": "contact", "id": contact["chat_id"], "name": contact["display_name"]}
             for contact in self.contacts.values()
         ]
-        return contacts + communities
+
+        # Group chats in RPC endpoint are chat type 3
+        data = self.__call_rpc("messaging", "activeChats")
+        group_chats = [
+            {"type": "group_chat", "id": active_chat["id"], "name": active_chat["name"]}
+            for active_chat in data.get("result", [])
+            if active_chat["chatType"] == 3
+        ]
+        return contacts + communities + group_chats
 
     def send_message(self, chat_id: str, message: str):
         """
