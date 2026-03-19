@@ -310,7 +310,7 @@ class Account:
         return self.__signal
 
     @property
-    def communities(self) -> dict[str, dict]:
+    def communities(self) -> list[dict]:
         """
         Get the communities that the bot is in.
         NOTE: We do not use internal state so we can get dynamic values such as:
@@ -597,7 +597,7 @@ class Account:
             response = requests.post(self.urls["http"]["load_backup"], json=params)
             error: str = response.json().get("error", "")
             if len(error) == 0:
-                self.__signal.get("history.request.completed")
+                self.__signal.get("messages.new")
                 self.logger.info(f"Successfully loaded file!")
                 break
 
