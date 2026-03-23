@@ -34,6 +34,7 @@ class Account:
         # As the docker-compose.yaml folder is at the moment
         # NOTE: This might change for initial release
         self.__backup_local_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), "backups")
+        os.makedirs(self.__backup_local_folder, exist_ok=True)
         self.__logger = Logger()
         self.__timestamp_divisor = 1_000
         self.__kd_iterations = 256000
@@ -150,7 +151,7 @@ class Account:
             "display_name": event["display-name"],
             "bio": event.get("bio", ""),
             "password": password,
-            "wallet_address": event["address"],
+            "wallet_address": event["dapps-address"],
             "logged_in_timestamp": datetime.datetime.now()
         }
         # Messenger can be activated only when logged in
@@ -575,8 +576,15 @@ class Account:
         Handles automatic logout when calling `del`
         and after running `python`
         """
-        self.logout()
-        self.__signal.close(None)
+        try:
+            self.logout()
+        except Exception:
+            pass
+
+        try:
+            self.__signal.close(None)
+        except Exception:
+            pass
 
     def call_rpc(self, prefix: str, method_name: str, params: Optional[Union[list, dict]] = None) -> dict:
         """
