@@ -1,9 +1,10 @@
 ---
 services:
     backend:
-        build:
-            context: https://github.com/status-im/status-go.git#develop
-        platform: linux/amd64
+        image: harbor.status.im/bi/status-backend:dev
+        # build:
+        #     context: https://github.com/status-im/status-go.git#develop
+        # platform: linux/amd64
         container_name: status-backend
         ports:
             - 8080:8080

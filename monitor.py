@@ -32,6 +32,68 @@ def load_config(file_path: str) -> dict:
 
     return config
 
+def extract_community_members(account: Account, community_id: str) -> pd.DataFrame:
+    """
+    Extract the community members. Uses manual RPC call function.
+
+    Parameters:
+        - `account` - logged in Status Bot account
+        - `community_id` - community ID as it is in `account.communities`
+
+    Output:
+        - DataFrame with all of the members
+    """
+    data = account.call_rpc("messaging", "communities")
+    for result in data["result"]:
+        if result["id"] != community_id:
+            continue
+
+        extract_timestamp = datetime.datetime.now()
+
+        members = pd.DataFrame([
+            {
+                "community_id": community_id,
+                "member_id": member_id,
+                "last_checked": datetime.datetime.fromtimestamp(info["last_update_clock"]) if "last_update_clock" in info else None,
+                "extract_timestamp": extract_timestamp
+            }
+            for member_id, info in result["members"].items()
+        ])
+        return members
+
+    return pd.DataFrame()
+
+def extract_community_channels(account: Account, community: dict, start_timestamp: datetime.datetime, end_timestamp: datetime.datetime) -> pd.DataFrame:
+    """
+    Extract the community channel messages.
+
+    Parameters:
+        - `account` - logged in Status Bot account
+        - `community` - the current community from `account`
+        - `start_timestamp` - start timestamp for message fetching
+        - `end_timestamp` - end timestamp for message fetching
+
+    Output:
+        - DataFrame with all of the community messages for the given start and end timestamps
+    """
+    final = []
+    for channel in community["channels"]:
+        messages = account.get_messages(channel["chat_id"], start_timestamp, end_timestamp)
+
+        messages = pd.DataFrame(messages)
+        if len(messages) == 0:
+            account.logger.info(f"No messages found for # {channel['name']}")
+            continue
+
+        account.logger.info(f"Extracted {len(messages)} message(s) from # {channel['name']}")
+        messages = messages.assign(
+            community_id = community["id"],
+            extracted_timestamp = datetime.datetime.now()
+        )
+        final.append(messages)
+
+    return pd.concat(final, ignore_index=True) if final else pd.DataFrame()
+
 def download(folder: str, config: dict):
     """
     Download Status App messages / info from communities and store them in pickle files.
@@ -79,40 +141,16 @@ def download(folder: str, config: dict):
         with open(file_path, "wb") as f:
             pickle.dump(community, f)
 
-        data = account.call_rpc("messaging", "communities")
-        for result in data["result"]:
-            if result["id"] != community["id"]:
-                continue
-
-            extract_timestamp = datetime.datetime.now()
-            file_path = os.path.join(members_info_folder, "")
-            members = pd.DataFrame([
-                {
-                    "community_id": community["id"],
-                    "member_id": member_id,
-                    "last_checked": datetime.datetime.fromtimestamp(info["last_update_clock"]) if "last_update_clock" in info else None,
-                    "extract_timestamp": extract_timestamp
-                }
-                for member_id, info in result["members"].items()
-            ])
+        members = extract_community_members(account, community["id"])
+        if len(members) > 0:
             members.to_pickle(os.path.join(members_info_folder, get_file_name()))
-            break
 
-        for channel in community["channels"]:
-            messages = account.get_messages(channel["chat_id"], start_timestamp, end_timestamp)
+        messages = extract_community_channels(account, community, start_timestamp, end_timestamp)
+        if len(messages) > 0:
             file_path = os.path.join(messages_folder, get_file_name())
-            messages = pd.DataFrame(messages)
-            if len(messages) == 0:
-                account.logger.info(f"No messages found for # {channel['name']}")
-                continue
+            messages.to_pickle(file_path)
 
-            account.logger.info(f"Extracted {len(messages)} message(s) from # {channel['name']}")
-            messages.assign(
-                community_id = community["id"],
-                extracted_timestamp = datetime.datetime.now()
-            ).to_pickle(file_path)
-
-def upload(folder: str, config: dict):
+def store(folder: str, config: dict):
     """
     Upload Status App `download` file to Postgres.
     NOTE: The Postgres schema must already exist
@@ -183,7 +221,7 @@ if __name__ == "__main__":
     upload_folder = os.path.join(os.path.dirname(__file__), "uploads")
 
     download_process = Process(target=run_factory, args=(upload_folder, config, download))
-    upload_process = Process(target=run_factory, args=(upload_folder, config, upload))
+    store_process = Process(target=run_factory, args=(upload_folder, config, store))
 
-    upload_process.start()
     download_process.start()
+    store_process.start()

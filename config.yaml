@@ -6,7 +6,7 @@ postgres:
         members: "raw_community_activity"
 sleep:
     # Values must be in MINUTES
-    upload: 15      # 15 min
+    store: 15      # 15 min
     download: 1440  # 1 day
 # Parameters based on Account class
 bot_params:
