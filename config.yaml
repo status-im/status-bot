@@ -4,10 +4,8 @@ postgres:
         messages: "raw_messages"
         community: "raw_community_info"
         members: "raw_community_activity"
-sleep:
-    # Values must be in MINUTES
-    store: 15      # 15 min
-    download: 1440  # 1 day
+# Value must be in MINUTES
+sleep: 1440 # 1 day
 # Parameters based on Account class
 bot_params:
     # localhost - to run code locally with Status Backend Dockerfile

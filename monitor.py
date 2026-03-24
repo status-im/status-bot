@@ -2,8 +2,6 @@ import datetime, os, pickle, yaml, time
 import pandas as pd
 from pathlib import Path
 from dotenv import load_dotenv
-from multiprocessing import Process
-from collections.abc import Callable
 # Manual file imports
 from bot import Account, Logger
 from postgres import Postgres
@@ -132,23 +130,31 @@ def download(folder: str, config: dict):
     start_timestamp: datetime.datetime = to_midnight(now - datetime.timedelta(days=30))
     end_timestamp: datetime.datetime = to_midnight(now - datetime.timedelta(days=1))
 
-    get_file_name = lambda: str(datetime.datetime.now().timestamp()).replace(".", "") + ".pkl"
+    get_file_name = lambda: str(to_midnight(datetime.datetime.now()).timestamp()).replace(".", "") + ".pkl"
 
     for community in account.communities:
         account.logger.info(f"Extracting data for {community['name']} from {start_timestamp} to {end_timestamp}")
         community["extracted_timestamp"] = datetime.datetime.now()
         file_path = os.path.join(community_info_folder, get_file_name())
-        with open(file_path, "wb") as f:
-            pickle.dump(community, f)
 
-        members = extract_community_members(account, community["id"])
-        if len(members) > 0:
-            members.to_pickle(os.path.join(members_info_folder, get_file_name()))
+        if not os.path.exists(file_path):
+            with open(file_path, "wb") as f:
+                pickle.dump(community, f)
+            account.logger.info(f"Created {file_path}")
 
-        messages = extract_community_channels(account, community, start_timestamp, end_timestamp)
-        if len(messages) > 0:
-            file_path = os.path.join(messages_folder, get_file_name())
-            messages.to_pickle(file_path)
+        file_path = os.path.join(members_info_folder, get_file_name())
+        if not os.path.exists(file_path):
+            members = extract_community_members(account, community["id"])
+            if len(members) > 0:
+                members.to_pickle(file_path)
+                account.logger.info(f"Created {file_path}")
+
+        file_path = os.path.join(messages_folder, get_file_name())
+        if not os.path.exists(file_path):
+            messages = extract_community_channels(account, community, start_timestamp, end_timestamp)
+            if len(messages) > 0:
+                messages.to_pickle(file_path)
+                account.logger.info(f"Created {file_path}")
 
 def store(folder: str, config: dict):
     """
@@ -203,25 +209,15 @@ def store(folder: str, config: dict):
     for file_path in completed:
         os.remove(file_path)
 
-def run_factory(folder: str, config: dict, func: Callable[[str, dict], None]):
-    """
-    Run either `upload` or `download` function
-    """
-    logger = Logger()
-    logger.info(f"Starting {func.__name__}")
-    while True:
-        func(folder, config)
-        seconds = config["sleep"][func.__name__] * 60
-        logger.info(f"Function {func.__name__} sleeping for {config['sleep'][func.__name__]} minute(s)")
-        time.sleep(seconds)
 
 if __name__ == "__main__":
     folder = os.path.dirname(__file__)
     config = load_config(os.path.join(folder, "config.yaml"))
     upload_folder = os.path.join(os.path.dirname(__file__), "uploads")
+    logger = Logger()
 
-    download_process = Process(target=run_factory, args=(upload_folder, config, download))
-    store_process = Process(target=run_factory, args=(upload_folder, config, store))
-
-    download_process.start()
-    store_process.start()
+    while True:
+        download(upload_folder, config)
+        store(upload_folder, config)
+        logger.info(f"Sleeping for {config['sleep']} minute(s)")
+        time.sleep(config["sleep"])
