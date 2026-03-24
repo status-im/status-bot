@@ -410,7 +410,10 @@ class Account:
         """
         Listen for new **RAW** messages continuously. Can be used for real time processing.
         """
-        return self.signal.listen("messages.new")
+        for message in self.signal.listen("messages.new"):
+            event: dict = message.get("event", {})
+            if "chats" in event or "messages" in event:
+                yield message
 
     def get_messages(self, chat_id: str, start_timestamp: Optional[datetime.datetime] = None, end_timestamp: Optional[datetime.datetime] = None) -> list[dict]:
         """
