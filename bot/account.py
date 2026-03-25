@@ -34,6 +34,7 @@ class Account:
         # As the docker-compose.yaml folder is at the moment
         # NOTE: This might change for initial release
         self.__backup_local_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), "backups")
+        os.makedirs(self.__backup_local_folder, exist_ok=True)
         self.__logger = Logger()
         self.__timestamp_divisor = 1_000
         self.__kd_iterations = 256000
@@ -150,7 +151,7 @@ class Account:
             "display_name": event["display-name"],
             "bio": event.get("bio", ""),
             "password": password,
-            "wallet_address": event["address"],
+            "wallet_address": event["dapps-address"],
             "logged_in_timestamp": datetime.datetime.now()
         }
         # Messenger can be activated only when logged in
@@ -310,7 +311,7 @@ class Account:
         return self.__signal
 
     @property
-    def communities(self) -> dict[str, dict]:
+    def communities(self) -> list[dict]:
         """
         Get the communities that the bot is in.
         NOTE: We do not use internal state so we can get dynamic values such as:
@@ -409,7 +410,10 @@ class Account:
         """
         Listen for new **RAW** messages continuously. Can be used for real time processing.
         """
-        return self.signal.listen("messages.new")
+        for message in self.signal.listen("messages.new"):
+            event: dict = message.get("event", {})
+            if "chats" in event or "messages" in event:
+                yield message
 
     def get_messages(self, chat_id: str, start_timestamp: Optional[datetime.datetime] = None, end_timestamp: Optional[datetime.datetime] = None) -> list[dict]:
         """
@@ -575,8 +579,15 @@ class Account:
         Handles automatic logout when calling `del`
         and after running `python`
         """
-        self.logout()
-        self.__signal.close(None)
+        try:
+            self.logout()
+        except Exception:
+            pass
+
+        try:
+            self.__signal.close(None)
+        except Exception:
+            pass
 
     def call_rpc(self, prefix: str, method_name: str, params: Optional[Union[list, dict]] = None) -> dict:
         """
@@ -597,7 +608,7 @@ class Account:
             response = requests.post(self.urls["http"]["load_backup"], json=params)
             error: str = response.json().get("error", "")
             if len(error) == 0:
-                self.__signal.get("history.request.completed")
+                self.__signal.get("messages.new")
                 self.logger.info(f"Successfully loaded file!")
                 break
 

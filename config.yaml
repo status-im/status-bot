@@ -4,19 +4,12 @@ postgres:
         messages: "raw_messages"
         community: "raw_community_info"
         members: "raw_community_activity"
-
-status_app:
-    bot_name: null # Optional. Can be specified in .env - read README.md
-    channels:
-        - https://status.app/c/G6EAAMSs5eYUrSjkDriqGHx1OITK3bd8aUlQKA9M5Mg08uTbwYKNMVxLXxDGfzde3Ub9OeDeNCmVTbP-vZs-rsCtWIUKDBBWUBXrEaGpJQ5Kaj0o4pYlcJ0iLlnP-MQRxCRwy3pE3JOiMxYYIyb4WtmaksZHTHQKCLUc14iNpWoidEbVeeO2g931cXu8Lns3Bw==#zQ3shsFYujbDQdRhSKS9RHuGCwxHQ1WLkNYvGPRksf4ebDWFW
-    url:
-        port: 8080
-        is_https: false
-    backend_params:
-        logLevel: "INFO"
-        data_dir: "./data-dir"
-
-sleep:
-    # Values must be in MINUTES
-    upload: 15      # 15 min
-    download: 1440  # 1 day
+# Value must be in MINUTES
+sleep: 1440 # 1 day
+# Parameters based on Account class
+bot_params:
+    # localhost - to run code locally with Status Backend Dockerfile
+    # status-backend - to run code with docker-compose.yaml
+    domain: "status-backend"
+    port: 8080
+    is_secure: false

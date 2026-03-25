@@ -1,6 +1,6 @@
 # [Status App Monitoring](https://status.app/)
 
-Monitoring tool for Status App communities
+Monitoring tool for Status App communities.
 
 # Setup
 
@@ -11,9 +11,9 @@ Monitoring tool for Status App communities
 - `POSTGRES_DATABASE` - The database name in the Postgres connection.
 - `POSTGRES_HOST` - The Postgres host name that will be remotely connected to.
 - `POSTGRES_PORT` - The Postgres port that will be remotely connected to.
-- `STATUS_BACKEND_BASE_URL` (**OPTIONAL**) - The Status Backend URL. If you are running locally you do not need this variable (`localhost` will be automatically set). If you are running it in a Docker container, please set it to `status-backend` (as the `container_name` of the `docker-compose.yaml`).
-- `STATUS_USERNAME` - The Status username that will be used to create an account. This is required if you are running **Dockerfile** for `create_account.py`.
-- `STATUS_PASSWORD` - The Status password that will be used to create an account. This is required if you are running **Dockerfile** for `create_account.py`.
+- `STATUS_DISPLAY_NAME` - The Status display name that will be used to create an account.
+- `STATUS_PASSWORD` - The Status password that will be used to create an account.
+- `STATUS_MNEMONIC` - The mnemonic used to recover the account. If passed a `.bkp` file will be loaded as well. Use this when you want to login to a bot account via Status App, join a community / leave community and export the `.bkp` file.
 
 ## Docker deployement
 
@@ -22,26 +22,16 @@ You can use the `docker-compose.yaml` to run the project.
 Example of `.env` file to use
 ```
 # Status Backend connection
-STATUS_BACKEND_BASE_URL=status-backend
-STATUS_USERNAME=bot-status
-STATUS_PASSWORD=ChangeThisPassword
-INIT_ACCOUNT=true
+STATUS_DISPLAY_NAME = "bot-status"
+STATUS_PASSWORD = "ChangeThisPassword"
+STATUS_MNEMONIC= "test test test test test test test test test test test test"
+
 # Database config
 POSTGRES_HOST=database
 POSTGRES_PORT=5432
 POSTGRES_DATABASE=status-bot
 POSTGRES_USERNAME=status
 POSTGRES_PASSWORD=ChangeThisOneAlso
-```
-
-` INIT_ACCOUNT=true` will create a new account, if set to false, it will the credentials in the `accounts/ ` directory.
-
-### Status Backend
-
-Run Backend independently so you can develop and test locally.
-
-```bash
-docker compose run status-backend up -d
 ```
 
 ## Python
@@ -61,13 +51,14 @@ pip install -r requirements.txt
 
 **Note**: If you are on Windows, you will have to install `psycopg2` instead of `psycopg2-binary`.
 
+# Backups
+
+If you have already created a Status account and want to use it with it's current data, please make sure you export the `.bkp` file and put it in folder **backups** and have the following `.env` variables:
+
+- `STATUS_DISPLAY_NAME`
+- `STATUS_PASSWORD`
+- `STATUS_MNEMONIC`
+
 # Files
 
-Short explanation of what each runnable file does:
-
-- `create_account.py` - create a Status App account for the given `username` and `password`. Example runs:
-  - `python create_account.py -u snt-maxxer -p StatusApp#123`
-  - `python create_account.py --username snt-maxxer --password StatusApp#123`
-  - `python create_account.py` works if you have added `STATUS_USERNAME` and `STATUS_PASSWORD` in your `.env` file.
-- `download.py` - download all messages and overall community info from the specified Status App channels in `config.yaml`.
-- `upload.py` - upload data from `download.py` to Postgres.
+- `monitor.py` - Status community message monitoring. It will download and upload messages in parallel.

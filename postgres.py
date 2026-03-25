@@ -5,16 +5,19 @@ https://github.com/status-im/ift-data-py/blob/master/ift_data/clients/postgres.p
 
 import psycopg2
 import pandas as pd
-from typing import Optional
+from typing import Optional, Union
 from sqlalchemy import create_engine
 from sqlalchemy.dialects.postgresql import JSONB
 
 class Postgres:
-    
-    def __init__(self, username: str, password: str, port: int = 5432, database: str = "data-warehouse", host: str = "data-01.do-ams3.bi.test.status.im"):
-        
+
+    def __init__(self, username: str, password: str, port: Union[int, str], database: str, host: str):
+
+        if isinstance(port, str):
+            port = int(port)
+
         self.__params = {
-            "host": host, 
+            "host": host,
             "user": username,
             "password": password,
             "port": port,
@@ -36,6 +39,7 @@ class Postgres:
             - `schema` - the name of the schema
             - `json_columns` - when creating the table, `dict` columns will be turned into JSON objects in Postgres
         """
+        self.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
         engine = create_engine(self.__url)
 
         data.columns = [column.lower() for column in data.columns]
@@ -52,10 +56,40 @@ class Postgres:
                 json_column: JSONB
                 for json_column in json_columns
             }
-        
+
         data.to_sql(**params)
 
+    def execute(self, query: str):
+        """
+        Execute queries such as INSERT, UPDATE, DELETE etc.
+
+        Parameters:
+            -  `query` - the PostgreSQL query
+        """
+        self.__execute(query)
+        self.__conn.commit()
 
     def close(self):
         self.__cursor.close()
         self.__conn.close()
+
+    def __del__(self):
+        self.close()
+
+    def __execute(self, query: str):
+
+        failed = False
+        is_closed = bool(self.__conn.closed)
+
+        if is_closed:
+            self.__conn: psycopg2.extensions.connection = psycopg2.connect(**self.__params)
+            self.__cursor: psycopg2.extensions.cursor = self.__conn.cursor()
+
+        try:
+            self.__cursor.execute(query)
+        except psycopg2.errors.InFailedSqlTransaction:
+            self.__conn.rollback()
+            failed = True
+
+        if failed:
+            self.__cursor.execute(query)

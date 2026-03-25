@@ -214,7 +214,6 @@ __marimo__/
 /uploads
 *.DS_Store
 *.pkl
-*.dockerignore
 # Docker volumes for Status
 /data-dir
 *.bkp

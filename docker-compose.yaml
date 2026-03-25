@@ -2,6 +2,9 @@
 services:
     backend:
         image: harbor.status.im/bi/status-backend:dev
+        # build:
+        #     context: https://github.com/status-im/status-go.git#develop
+        # platform: linux/amd64
         container_name: status-backend
         ports:
             - 8080:8080
@@ -25,7 +28,7 @@ services:
             - backend
             - database
         volumes:
-            - ./accounts:/app/accounts
+            - ./backups:/backups
         env_file:
             - .env
         networks:
