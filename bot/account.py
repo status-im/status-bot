@@ -103,21 +103,8 @@ class Account:
             "password": password,
             'kdfIterations': self.__kd_iterations
         }
-        if is_recovery:
-            self.__validate_display_name(display_name)
-            params = {
-                "mnemonic": mnemonic,
-                "rootDataDir": self.__docker_data_folder,
-                "kdfIterations": self.__kd_iterations,
-                "displayName": display_name,
-                "password": password,
-                "customizationColor": "primary",
-                "wakuV2LightClient": False,
-                "thirdpartyServicesEnabled": True
-            }
-            url_key = "restore"
-            self.logger.info(f"Restoring account for given mnemonics")
-        elif is_new_account:
+
+        if is_new_account or is_recovery:
             self.__validate_display_name(display_name)
             params = {
                 "rootDataDir": self.__docker_data_folder,
@@ -128,10 +115,17 @@ class Account:
                 "wakuV2LightClient": False,
                 "thirdpartyServicesEnabled": True,
             }
-            url_key = "create"
-            self.logger.info(f"Creating account with display_name {display_name}")
         else:
             self.logger.info(f"Logging in with Key UID - {key_uid}")
+
+        if is_new_account:
+            self.logger.info(f"Creating account with display_name {display_name}")
+            url_key = "create"
+
+        if is_recovery:
+            url_key = "restore"
+            params["mnemonic"] = mnemonic
+            self.logger.info(f"Restoring account for given mnemonics")
 
         self.logout()
         url = self.urls["http"][url_key]
@@ -144,6 +138,7 @@ class Account:
         event: dict = signal_event["event"]["settings"]
         self.__info = {
             "public_key": event["public-key"],
+            "url": None,
             "emojis": event["emojiHash"],
             "key_uid": event["key-uid"],
             "compressed_key": event["compressedKey"],
@@ -154,6 +149,7 @@ class Account:
             "wallet_address": event["dapps-address"],
             "logged_in_timestamp": datetime.datetime.now()
         }
+        self.__info["url"] = self.__call_rpc("urls", "shareUserURLWithData", [event["public-key"]]).get("result")
         # Messenger can be activated only when logged in
         self.__start_messenger()
         if is_recovery:
@@ -283,6 +279,7 @@ class Account:
         contacts = {
             contact["id"]: {
                 "public_key": contact["id"],
+                "url": self.__call_rpc("urls", "shareUserURLWithData", [contact["id"]]).get("result"),
                 "chat_id": contact["id"],
                 "key_uid": contact["compressedKey"],
                 "emojis": contact["emojiHash"],
@@ -328,6 +325,7 @@ class Account:
         communities = [
             {
                 "id": community["id"],
+                "url": self.__call_rpc("urls", "shareCommunityURLWithData", [community["id"]]).get("result"),
                 "name": community["name"],
                 "verified": community["verified"],
                 "description": community["description"],
@@ -344,6 +342,7 @@ class Account:
                     {
                         "id": chat["id"],
                         "chat_id": community["id"] + chat["id"],
+                        "url": self.__call_rpc("urls", "shareCommunityChannelURLWithData", [community["id"], chat["id"]]).get("result"),
                         "name": chat["name"],
                         "description": chat["description"],
                         "permissions": {

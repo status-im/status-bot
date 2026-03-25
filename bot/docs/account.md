@@ -383,6 +383,7 @@ Provides information about the currently logged-in account. If `login()` has not
 | Key | Type | Description |
 |----|----|-------------|
 | `public_key` | `str` | Public key that uniquely identifies the account. |
+| `url` | `str` | The URL that can be shared with other users. |
 | `emojis` | `str` | Emoji hash associated with the account identity. |
 | `key_uid` | `str` | Internal Status key identifier for the account. |
 | `compressed_key` | `str` | The chat key as it is in Status App. |
@@ -425,6 +426,7 @@ Returns `dict[str, dict]` where the key is the contact's **public key**. This ma
 | Key | Type | Description |
 |----|----|-------------|
 | `public_key` | `str` | Public key that uniquely identifies the contact. |
+| `url` | `str` | The URL that can be shared with other users. |
 | `chat_id` | `str` | Chat identifier used for direct messaging. |
 | `key_uid` | `str` | Internal compressed key identifier used by Status Backend. |
 | `emojis` | `str` | Emoji hash associated with the contact identity. |
@@ -470,6 +472,7 @@ Returns `list[dict]` where each element represents a community.
 | Key | Type | Description |
 |----|----|-------------|
 | `id` | `str` | Unique identifier of the community. |
+| `url` | `str` | The URL that can be shared with other users. |
 | `name` | `str` | Name of the community. |
 | `verified` | `bool` | Whether the community is verified. |
 | `description` | `str` | Community description. |
@@ -489,6 +492,7 @@ Each channel contains:
 |----|----|-------------|
 | `id` | `str` | Channel identifier inside the community. |
 | `chat_id` | `str` | Combined community + channel ID used for sending messages. |
+| `url` | `str` | The URL that can be shared with other users. |
 | `name` | `str` | Channel name. |
 | `description` | `str` | Channel description. |
 | `permissions` | `dict` | Permissions for the channel. |
