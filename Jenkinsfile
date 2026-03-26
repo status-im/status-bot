@@ -38,7 +38,7 @@ pipeline {
     string(
       name: 'IMAGE_NAME',
       description: 'Name of the Docker image',
-      defaultValue: 'bi/status-monitoring',
+      defaultValue: 'bi/status-bot',
     )
   }
 
