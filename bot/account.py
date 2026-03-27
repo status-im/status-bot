@@ -686,7 +686,7 @@ class Account:
         if len(name) > 24:
             raise ValueError("Display name cannot be more than 24 characters long.")
 
-        if not re.fullmatch(r"[A-Za-z0-9_-]+", name):
-            raise ValueError("Display name can contain only A-Z, 0-9, hyphens (-), and underscores (_).")
+        if not re.fullmatch(r"[A-Za-z0-9 _-]+", name):
+            raise ValueError("Display name can contain only A-Z, 0-9, hyphens (-), underscores (_) and spaces.")
 
         return True

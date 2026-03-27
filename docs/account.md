@@ -9,6 +9,7 @@ The **display name** is the human‑readable identifier for a Status account. It
 Display names must follow strict validation rules enforced by the library and expected by the Status application. A valid display name must satisfy all of the following conditions:
 
 - It may contain **uppercase letters (`A–Z`)**
+- It may contain **spaces (` `)**
 - It may contain **numbers (`0–9`)**
 - It may contain **hyphens (`-`)**
 - It may contain **underscores (`_`)**
