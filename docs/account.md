@@ -52,7 +52,7 @@ Backup files (`.bkp`) can be both created in [Status App](https://our.status.im/
 
 ## Methods
 
-### `login(password, key_uid=None, display_name=None, mnemonic=None)`
+### `login(password, key_uid=None, display_name=None, mnemonic=None, infura_token=None)`
 
 Login to an existing Status account. If the account does not exist in the initialized data directory, a new account will be created and automatically logged in. After a successful login, the decentralized messenger service is automatically started so the account can send and receive messages.
 
@@ -64,6 +64,7 @@ An account can also be recovered if the `mnemonic` is passed.
 | `key_uid` | `str` | Yes* | Unique key identifier of the account. If provided, the account will be logged in directly using this identifier. If not provided, then you must use `display_name` and `password` to login. |
 | `display_name` | `str` | Yes* | Display name of the account. Used to resolve the `key_uid` if it is not provided, or to create a new account if one does not already exist. This field is required if an account needs to be recovered with `mnemonic`. |
 | `mnemonic` | `str` | No | The mnemonic from [`info`](./account.md#info). Use this field with `password` and `display_name` to recover the account. If you have [`.bkp`](./account.md#backup) files, in the backup Docker volume they will be automatically picked up and loaded.<br>**Note**: You can pass a different `display_name` but that will be internal only. When an account is recovered setting [`display_name`](./account.md#display_name) can be buggy. Ideally when recovering the account, use the original `display_name` of the account. |
+| `infura_token` | `str` | No | [RPC token](https://www.infura.io/) to allow Status Backend to use a wallet. |
 
 Returns the current `Account` instance, allowing method chaining.
 
@@ -109,7 +110,22 @@ account.login(**params)
 
 **Note**: When in recovery mode, the display name is updated on Status App as well so it is consistent locally and to other users.
 
+Wallet setup:
 
+```python
+from bot import Account
+
+account = Account()
+
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP",
+    "infura_token" : "token from https://www.infura.io/"
+}
+account.login(**params)
+```
+
+**Note**: `infura_token` can be used when creating, recovering and logging in to an account.
 
 ### `logout()`
 
@@ -350,6 +366,185 @@ account.login(**params)
 backup_path = account.backup()
 print(f"Backup created at: {backup_path}")
 ```
+
+### `get_tokens()`
+
+Retrieve all tokens available in Status Backend across all supported chains.
+
+Returns `pd.DataFrame`.
+
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `chain_id` | `int` | Chain ID where the token exists. Matches values from [`chains`](./account.md#chains). |
+| `address` | `str` | Token contract address. |
+| `symbol` | `str` | Token symbol (e.g. `ETH`, `USDT`). |
+| `decimals` | `int` | Number of decimals used for the token. |
+| `cross_chain_id` | `str`<br>`None` | Cross-chain identifier (if available). |
+| `source_id` | `str` | Source list from which the token was fetched. |
+
+```python
+from bot import Account
+
+account = Account()
+
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP",
+    "infura_token" : "token from https://www.infura.io/"
+}
+account.login(**params)
+available_tokens = account.get_tokens()
+```
+
+### `get_balance(token_addresses, chain_ids=1, wallets=None, ccy=None)`
+
+Retrieve token balances for one or more wallets across specified chains. This method supports querying multiple tokens, chains, and wallets. Balances are adjusted using token decimals. Optionally, values can be converted to fiat currencies.
+
+Returns `pd.DataFrame`.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `timestamp` | `datetime.datetime` | Timestamp when the balance was fetched. |
+| `wallet_address` | `str` | Wallet address for which the balance was retrieved. |
+| `token_address` | `str` | Token contract address. |
+| `token_symbol` | `str` | Token symbol (e.g. `ETH`, `USDT`). |
+| `amount` | `float` | Token balance (adjusted using token decimals). |
+| `chain_id` | `int` | Chain ID where the token exists. |
+| `ccy` | `str` | Fiat currency (only present if `ccy` is provided). |
+| `price` | `float` | Token price **for 1 `token_symbol`** in the given fiat currency (only present if `ccy` is provided). If you want to get the amount in the wallet, you must `amount * price`. |
+
+```python
+from bot import Account
+
+account = Account()
+
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP",
+    "infura_token" : "token from https://www.infura.io/"
+}
+account.login(**params)
+
+token_mapping = {
+    'ETH': '0x0000000000000000000000000000000000000000',
+    'SNT': '0x744d70fdbe2ba4cf95131626614a1763df805b9e',
+    'USDT': '0xdac17f958d2ee523a2206206994597c13d831ec7',
+    'CELO': '0x9b88d293b7a791e40d36a39765ffd5a1b9b5c349'
+}
+token_addresses = list(token_mapping.values())
+# Returns data for logged in wallet
+data = account.get_balance(token_addresses)
+```
+
+Access multuple chains:
+
+```python
+from bot import Account
+
+account = Account()
+
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP",
+    "infura_token" : "token from https://www.infura.io/"
+}
+account.login(**params)
+
+token_mapping = {
+    'ETH': '0x0000000000000000000000000000000000000000',
+    'SNT': '0x744d70fdbe2ba4cf95131626614a1763df805b9e',
+    'USDT': '0xdac17f958d2ee523a2206206994597c13d831ec7',
+    'CELO': '0x9b88d293b7a791e40d36a39765ffd5a1b9b5c349'
+}
+token_addresses = list(token_mapping.values())
+chain_ids = [1, 10] # Can be a single int value as well
+# Returns data for logged in wallet
+data = account.get_balance(token_addresses, chain_ids)
+```
+
+Access multiple wallets:
+
+```python
+from bot import Account
+
+account = Account()
+
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP",
+    "infura_token" : "token from https://www.infura.io/"
+}
+account.login(**params)
+
+token_mapping = {
+    'ETH': '0x0000000000000000000000000000000000000000',
+    'SNT': '0x744d70fdbe2ba4cf95131626614a1763df805b9e',
+    'USDT': '0xdac17f958d2ee523a2206206994597c13d831ec7',
+    'CELO': '0x9b88d293b7a791e40d36a39765ffd5a1b9b5c349'
+}
+token_addresses = list(token_mapping.values())
+chain_ids = [1, 10] # Can be a single int value as well
+
+vitalik_address = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+bot_wallet = account.info["wallet_address"]
+wallets = [bot_wallet, vitalik_address]
+
+data = account.get_balance(token_addresses, chain_ids, wallets)
+```
+
+Get token prices:
+
+```python
+from bot import Account
+
+account = Account()
+
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP",
+    "infura_token" : "token from https://www.infura.io/"
+}
+account.login(**params)
+
+token_mapping = {
+    'ETH': '0x0000000000000000000000000000000000000000',
+    'SNT': '0x744d70fdbe2ba4cf95131626614a1763df805b9e',
+    'USDT': '0xdac17f958d2ee523a2206206994597c13d831ec7',
+    'CELO': '0x9b88d293b7a791e40d36a39765ffd5a1b9b5c349'
+}
+token_addresses = list(token_mapping.values())
+chain_ids = [1, 10] # Can be a single int value as well
+
+vitalik_address = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+bot_wallet = account.info["wallet_address"]
+wallets = [bot_wallet, vitalik_address] # Can be a single str value as well
+ccy = ["GBP", "USD"] # Can be a single str value as well
+
+data = account.get_balance(token_addresses, chain_ids, wallets, ccy)
+```
+
+### `get_market(token_addresses, chain_ids=1, ccy="USD")`
+
+Retrieve market data for one or more tokens across specified chains. 
+
+Returns `pd.DataFrame`.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `timestamp` | `datetime.datetime` | Timestamp when the market data was fetched. |
+| `chain_id` | `int` | Chain ID where the token exists. |
+| `token_address` | `str` | Token contract address. |
+| `token_symbol` | `str` | Token symbol (e.g. `ETH`, `USDT`). |
+| `fiat_ccy` | `str` | Fiat currency used for the market data. |
+| `market_cap` | `float` | Total market capitalization of the token. |
+| `high_price` | `float` | Highest price in the last 24 hours. |
+| `low_price` | `float` | Lowest price in the last 24 hours. |
+| `pnl_24hr` | `float` | Absolute price change over the last 24 hours. |
+| `pct_change` | `float` | Percentage price change (day-level). |
+| `pct_change_1hr` | `float` | Percentage price change over the last hour. |
+| `pct_change_24hr` | `float` | Percentage price change over the last 24 hours. |
+
 
 ## Properties
 
@@ -684,4 +879,31 @@ account = Account()
 account.logger.info("Starting Status bot")
 account.logger.warning("This is a warning")
 account.logger.error("Something went wrong")
+```
+
+### `chains`
+
+Retrieve all **production blockchain networks** available in Status Backend. This property returns a mapping between `chain_id` and the corresponding **chain name**.
+
+Returns `dict[int, str]`.
+
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `chain_id` | `int` | Unique identifier of the blockchain network. |
+| `chain_name` | `str` | Human-readable name of the chain (e.g. `Ethereum`, `Optimism`). |
+
+
+```python
+from bot import Account
+
+account = Account()
+
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP",
+    "infura_token" : "token from https://www.infura.io/"
+}
+account.login(**params)
+print(account.chains)
 ```
