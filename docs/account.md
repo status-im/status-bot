@@ -37,7 +37,6 @@ node-42
 | ` mybot` | Leading space |
 | `mybot ` | Trailing space |
 | `bot!123` | Contains invalid character `!` |
-| `bot user` | Spaces are not allowed |
 
 If a display name does not follow these rules, a **`ValueError`** will be raised by the account validation logic.
 
@@ -49,6 +48,22 @@ Backup files (`.bkp`) can be both created in [Status App](https://our.status.im/
 - **Create backup** - by using [`backup()`](./account.md#backup) or creating one in [Status App](https://our.status.im/status-desktop-v2-35-local-backups-new-home-page-performance-boosts-and-more/).
 
 **Note**: Status App will not automatically backup messages. This has to be manually overridden on the app. When using the Python SDK, the messages are automatically stored in the `.bkp` files.
+
+
+## Wallet
+
+Wallet features are optional and can be omitted if not required for your use case. They provide functionality equivalent to the **Wallet** and **Market** tabs.
+
+![Status App Wallet](./images/wallet.png)
+
+**Methods**
+
+- [`get_tokens()`](./account.md#get_tokens)
+- [`get_balance(token_addresses, chain_ids=1, wallets=None, ccy=None)`](./account.md#get_balancetoken_addresses-chain_ids1-walletsnone-ccynone)
+- [`get_market(token_addresses, chain_ids=1, ccy="USD")`](./account.md#get_markettoken_addresses-chain_ids1-ccyusd)
+
+**Properties**
+- [`chains`](./account.md#chains)
 
 ## Methods
 
