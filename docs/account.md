@@ -423,7 +423,8 @@ account = Account()
 params = {
     "display_name": "status-app-bot",
     "password": "SNTPUMP",
-    "infura_token" : "token from https://www.infura.io/"
+    "infura_token" : "token from https://www.infura.io/",
+    "coingecko_api_key": "API key from https://www.coingecko.com/"
 }
 account.login(**params)
 available_tokens = account.get_tokens()
@@ -454,7 +455,8 @@ account = Account()
 params = {
     "display_name": "status-app-bot",
     "password": "SNTPUMP",
-    "infura_token" : "token from https://www.infura.io/"
+    "infura_token" : "token from https://www.infura.io/",
+    "coingecko_api_key": "API key from https://www.coingecko.com/"
 }
 account.login(**params)
 
@@ -479,7 +481,8 @@ account = Account()
 params = {
     "display_name": "status-app-bot",
     "password": "SNTPUMP",
-    "infura_token" : "token from https://www.infura.io/"
+    "infura_token" : "token from https://www.infura.io/",
+    "coingecko_api_key": "API key from https://www.coingecko.com/"
 }
 account.login(**params)
 
@@ -505,7 +508,8 @@ account = Account()
 params = {
     "display_name": "status-app-bot",
     "password": "SNTPUMP",
-    "infura_token" : "token from https://www.infura.io/"
+    "infura_token" : "token from https://www.infura.io/",
+    "coingecko_api_key": "API key from https://www.coingecko.com/"
 }
 account.login(**params)
 
@@ -535,7 +539,8 @@ account = Account()
 params = {
     "display_name": "status-app-bot",
     "password": "SNTPUMP",
-    "infura_token" : "token from https://www.infura.io/"
+    "infura_token" : "token from https://www.infura.io/",
+    "coingecko_api_key": "API key from https://www.coingecko.com/"
 }
 account.login(**params)
 
@@ -876,7 +881,11 @@ Channel permissions:
 from bot import Account
 
 account = Account()
-account.login("status-app-bot", "SNTPUMP")
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
 
 for community in account.communities:
     print(community["name"], community["members"])
@@ -938,8 +947,55 @@ account = Account()
 params = {
     "display_name": "status-app-bot",
     "password": "SNTPUMP",
-    "infura_token" : "token from https://www.infura.io/"
+    "infura_token" : "token from https://www.infura.io/",
+    "coingecko_api_key": "API key from https://www.coingecko.com/"
 }
 account.login(**params)
 print(account.chains)
+```
+
+#### `balance`
+
+Retrieve the current **non-zero balances** token balances for the **logged-in account wallet** across all supported chains.
+
+Returns `pd.DataFrame`.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `timestamp` | `datetime.datetime` | Timestamp when the balance was fetched. |
+| `address` | `str` | Token contract address. |
+| `chain_id` | `int` | Chain ID where the token exists. |
+| `amount` | `float` | Token balance (adjusted using token decimals). |
+| `symbol` | `str` | Token symbol (e.g. `ETH`, `USDT`). |
+
+```python
+from bot import Account
+
+account = Account()
+
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP",
+    "infura_token" : "token from https://www.infura.io/",
+    "coingecko_api_key": "API key from https://www.coingecko.com/"
+}
+account.login(**params)
+print(account.balance)
+```
+
+You can convert the current balance into fiat currency by using a [ISO 4217 currency code](https://www.iso.org/iso-4217-currency-codes.html) in the `[]` accessor:
+
+```python
+from bot import Account
+
+account = Account()
+
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP",
+    "infura_token" : "token from https://www.infura.io/",
+    "coingecko_api_key": "API key from https://www.coingecko.com/"
+}
+account.login(**params)
+print(account["GBP"])
 ```
