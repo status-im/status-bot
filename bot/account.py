@@ -54,21 +54,21 @@ class Account:
         # All available ISO 4217 currencies
         self.__iso4217_ccy = []
         # All tokens in Status Backend
-        self.http_base_url = f"http{'s' if is_secure else ''}://{domain}:{port}/statusgo/"
-        self.ws_base_url = f"ws://{domain}:{port}/"
+        self.__http_base_url = f"http{'s' if is_secure else ''}://{domain}:{port}/statusgo/"
+        self.__ws_base_url = f"ws://{domain}:{port}/"
         self.urls = {
             "http": {
-                "initialize": f"{self.http_base_url}InitializeApplication",
-                "login": f"{self.http_base_url}LoginAccount",
-                "create": f"{self.http_base_url}CreateAccountAndLogin",
-                "restore": f"{self.http_base_url}RestoreAccountAndLogin",
-                "logout": f"{self.http_base_url}Logout",
-                "create_backup": f"{self.http_base_url}PerformLocalBackup",
-                "load_backup": f"{self.http_base_url}LoadLocalBackup",
-                "rpc": f"{self.http_base_url}CallRPC",
+                "initialize": f"{self.__http_base_url}InitializeApplication",
+                "login": f"{self.__http_base_url}LoginAccount",
+                "create": f"{self.__http_base_url}CreateAccountAndLogin",
+                "restore": f"{self.__http_base_url}RestoreAccountAndLogin",
+                "logout": f"{self.__http_base_url}Logout",
+                "create_backup": f"{self.__http_base_url}PerformLocalBackup",
+                "load_backup": f"{self.__http_base_url}LoadLocalBackup",
+                "rpc": f"{self.__http_base_url}CallRPC",
             },
             "socket": {
-                "signals": f"{self.ws_base_url}signals"
+                "signals": f"{self.__ws_base_url}signals"
             }
         }
         self.__signal = Signal(self.urls["socket"]["signals"])
@@ -77,7 +77,7 @@ class Account:
         # In case if there is a hanging logged in session
         self.logout()
 
-    def login(self, password: str, key_uid: Optional[str] = None, display_name: Optional[str] = None, mnemonic: Optional[str] = None, infura_token: Optional[str] = None):
+    def login(self, password: str, key_uid: Optional[str] = None, display_name: Optional[str] = None, mnemonic: Optional[str] = None, infura_token: Optional[str] = None, coingecko_api_key: Optional[str] = None):
         """
         Login to the given account. If it does not exist,
         it will be created and automatically logged in.
@@ -88,6 +88,7 @@ class Account:
             - `display_name` - your Status display name. Use `display_name` and `password` parameter combination if you have a 1 to 1 mapping (each display name has a unique `key_uid`)
             - `mnemonic` - the mnemonic when creating an account. Use this field with `password` and `display_name` to recover an account
             - `infura_token` - https://www.infura.io/ RPC token to allow Status Backend to use a wallet
+            - `coingecko_api_key` - https://www.coingecko.com/ API key to allow Status Backend to use a wallet
         """
         if not key_uid and not display_name:
             raise ValueError("Please provide either a Key Unique Identifier (key_uid) or a Display Name (display_name)...")
@@ -147,6 +148,9 @@ class Account:
         if infura_token:
             params["infuraToken"] = infura_token
             self.__is_wallet_set = True
+
+        if coingecko_api_key:
+            params["coingeckoApiKey"] = coingecko_api_key
 
         url = self.urls["http"][url_key]
         response = requests.post(url, json=params)

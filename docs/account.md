@@ -1,10 +1,12 @@
 # Account
 
+![Account header image](./images/overview-account.png)
+
 The account class allows you to easily work with a Status account.
 
 ## Display name
 
-The **display name** is the human‑readable identifier for a Status account. It is used when creating an account, resolving an existing account during [`login`](./account.md#loginpassword-key_uidnone-display_namenone), and when updating the account name through the [`display_name`](./account.md#display_name) property.
+The **display name** is the human‑readable identifier for a Status account. It is used when creating an account, resolving an existing account during [`login`](./account.md#loginpassword-key_uidnone-display_namenone-mnemonicnone-infura_tokennonecoingecko_api_keynone), and when updating the account name through the [`display_name`](./account.md#display_name) property.
 
 Display names must follow strict validation rules enforced by the library and expected by the Status application. A valid display name must satisfy all of the following conditions:
 
@@ -42,12 +44,16 @@ If a display name does not follow these rules, a **`ValueError`** will be raised
 
 ## Backups
 
-Backup files (`.bkp`) can be both created in [Status App](https://our.status.im/status-desktop-v2-35-local-backups-new-home-page-performance-boosts-and-more/) and the [Python SDK](./account.md#backup). Status Backend backup folder is exposed in a Docker volume so users can:
+Backup files (`.bkp`) can be both created in [Status App](https://our.status.im/status-desktop-v2-35-local-backups-new-home-page-performance-boosts-and-more/) and the [Python SDK](./account.md#backup). 
 
-- **Upload backup** - by dropping`.bkp` files in the `backups` folder locally (linked to Status Backend Docker container). Backups are automatically uploaded if a [`mnemonic` is provided during `login`](./account.md#loginpassword-key_uidnone-display_namenone-mnemonicnone).
+![Status App Backup](./images/backup.png)
+
+[Status Backend](https://github.com/status-im/status-go) backup folder is exposed in a Docker volume so users can:
+
+- **Upload backup** - by dropping `.bkp` files in the `backups` folder locally (linked to Status Backend Docker container). Backups are automatically uploaded if a [`mnemonic` is provided during `login`](./account.md#loginpassword-key_uidnone-display_namenone-mnemonicnone-infura_tokennonecoingecko_api_keynone).
 - **Create backup** - by using [`backup()`](./account.md#backup) or creating one in [Status App](https://our.status.im/status-desktop-v2-35-local-backups-new-home-page-performance-boosts-and-more/).
 
-**Note**: Status App will not automatically backup messages. This has to be manually overridden on the app. When using the Python SDK, the messages are automatically stored in the `.bkp` files.
+**Note**: Status App will not automatically backup messages. This has to be manually overridden on the app (above screenshot). When using the Python SDK, the messages are automatically stored in the `.bkp` files.
 
 
 ## Wallet
@@ -56,34 +62,31 @@ Wallet features are optional and can be omitted if not required for your use cas
 
 ![Status App Wallet](./images/wallet.png)
 
-**Methods**
-
-- [`get_tokens()`](./account.md#get_tokens)
-- [`get_balance(token_addresses, chain_ids=1, wallets=None, ccy=None)`](./account.md#get_balancetoken_addresses-chain_ids1-walletsnone-ccynone)
-- [`get_market(token_addresses, chain_ids=1, ccy="USD")`](./account.md#get_markettoken_addresses-chain_ids1-ccyusd)
-
-**Properties**
-- [`chains`](./account.md#chains)
 
 ## Methods
 
-### `login(password, key_uid=None, display_name=None, mnemonic=None, infura_token=None)`
+### `login(password, key_uid=None, display_name=None, mnemonic=None, infura_token=None,coingecko_api_key=None)`
 
-Login to an existing Status account. If the account does not exist in the initialized data directory, a new account will be created and automatically logged in. After a successful login, the decentralized messenger service is automatically started so the account can send and receive messages.
+Login to an existing Status account. If the account does not exist in the initialized data directory, a new account will be created and automatically logged in. 
 
-An account can also be recovered if the `mnemonic` is passed.
+![Account creation](./images/login/create.png)
+
+After a successful login, the decentralized messenger service is automatically started so the account can send and receive messages.
+
+An account can also be recovered if the [`mnemonic`](https://status.app/help/profile/understand-your-status-keys-and-recovery-phrase#about-your-recovery-phrase) is passed.
 
 | Name | Type | Required | Description |
 |-----|-----|-----|-------------|
 | `password` | `str` | Yes | Password used to encrypt the account |
 | `key_uid` | `str` | Yes* | Unique key identifier of the account. If provided, the account will be logged in directly using this identifier. If not provided, then you must use `display_name` and `password` to login. |
 | `display_name` | `str` | Yes* | Display name of the account. Used to resolve the `key_uid` if it is not provided, or to create a new account if one does not already exist. This field is required if an account needs to be recovered with `mnemonic`. |
-| `mnemonic` | `str` | No | The mnemonic from [`info`](./account.md#info). Use this field with `password` and `display_name` to recover the account. If you have [`.bkp`](./account.md#backup) files, in the backup Docker volume they will be automatically picked up and loaded.<br>**Note**: You can pass a different `display_name` but that will be internal only. When an account is recovered setting [`display_name`](./account.md#display_name) can be buggy. Ideally when recovering the account, use the original `display_name` of the account. |
+| `mnemonic` | `str` | No | The [mnemonic](https://status.app/help/profile/understand-your-status-keys-and-recovery-phrase#about-your-recovery-phrase) from [`info`](./account.md#info). Use this field with `password` and `display_name` to recover the account. If you have [`.bkp`](./account.md#backup) files, in the backup Docker volume they will be automatically picked up and loaded.<br><br>**Note**: You can pass a different `display_name` but that will be internal only. When an account is recovered setting [`display_name`](./account.md#display_name) can be buggy. Ideally when recovering the account, use the original `display_name` of the account. |
 | `infura_token` | `str` | No | [RPC token](https://www.infura.io/) to allow Status Backend to use a wallet. |
+| `coingecko_api_key` | `str` | No | [API token](https://www.coingecko.com/) to allow Status Backend to use a wallet. |
 
 Returns the current `Account` instance, allowing method chaining.
 
-Login with `display_name`:
+#### Login with `display_name`
 ```python
 from bot import Account
 
@@ -95,9 +98,14 @@ params = {
 account.login(**params)
 ```
 
+The code above is equivalent to the following screen on Status App:
+
+![Log in screen](./images/login/log-in.png)
+
 **Note**: This assumes that `display_name` and is unique for every `key_uid`. If there are duplicated `display_names` then the first found match will be used. You can log in with `key_uid` if you have `display_name` duplicates.
 
-Login with `key_uid`:
+#### Login with `key_uid`
+
 ```python
 from bot import Account
 
@@ -109,7 +117,7 @@ params = {
 account.login(**params)
 ```
 
-Recover account:
+#### Recover account
 
 ```python
 from bot import Account
@@ -123,9 +131,13 @@ params = {
 account.login(**params)
 ```
 
+The code above is equivalent to the following screen on Status App:
+
+![Recover screen](./images/login/recover.png)
+
 **Note**: When in recovery mode, the display name is updated on Status App as well so it is consistent locally and to other users.
 
-Wallet setup:
+#### Wallet setup
 
 ```python
 from bot import Account
@@ -135,12 +147,13 @@ account = Account()
 params = {
     "display_name": "status-app-bot",
     "password": "SNTPUMP",
-    "infura_token" : "token from https://www.infura.io/"
+    "infura_token" : "token from https://www.infura.io/",
+    "coingecko_api_key": "API key from https://www.coingecko.com/"
 }
 account.login(**params)
 ```
 
-**Note**: `infura_token` can be used when creating, recovering and logging in to an account.
+**Note**: `infura_token` and `coingecko_api_key` can be used when creating, recovering and logging in to an account.
 
 ### `logout()`
 
@@ -164,8 +177,29 @@ Returns the current `Account` instance. This allows chaining additional operatio
 
 **Note**: Currently `logout` works for a single sign in and may break because it does not listen for [`signals`](./account.md#signal).
 
+### `backup()`
 
-### `send_message(chat_id, message)`
+Create a **local backup file** (`.bkp`) for the currently logged‑in account. The backup is generated by the Status Backend and stored inside the configured Docker backup volume. Each file is uniquely associated with an account. If the backup creation fails, an **exception will be raised**.
+
+Returns `str` representing the **Docker path** of the generated backup file. The returned path refers to the **Docker container path** where the backup was created. If the backup directory is mounted as a Docker volume, the file will also appear on the host machine in the mapped folder.
+
+```python
+from bot import Account
+
+account = Account()
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
+
+backup_path = account.backup()
+print(f"Backup created at: {backup_path}")
+```
+
+### Chat
+
+#### `send_message(chat_id, message)`
 
 Send a text message to a specific chat. This method currently supports **text messages only**.
 
@@ -189,7 +223,7 @@ chat = account.chats[0]
 account.send_message(chat["id"], "Hello from my Status bot!")
 ```
 
-### `get_messages(chat_id, start_timestamp=None, end_timestamp=None)`
+#### `get_messages(chat_id, start_timestamp=None, end_timestamp=None)`
 
 Retrieve messages from the specified chat within an optional time range. Messages are returned in **descending order** (newest to oldest). The method automatically paginates through the backend until all messages in the specified range are collected. This method is ideal for backfilling, [batch processing](https://aws.amazon.com/what-is/batch-processing/) or [micro batch processing](https://www.dremio.com/wiki/micro-batch-processing/).
 
@@ -229,7 +263,7 @@ for message in messages:
 
 **Note**: If there are missing messages in a chat that might be because the node (Status Backend) has not received them yet. They may appear later.
 
-### `listen_messages()`
+#### `listen_messages()`
 
 Listen for new incoming messages **in real time**. This method yields raw message events as they are received from the Status Backend [signal](./account.md#signallisten) `messages.new`. This method is ideal for developing real time chat applications
 
@@ -253,7 +287,7 @@ for msg in account.listen_messages():
 
 **Note**: If you receive multiple messages at once, `contacts` and `chats` will grow.
 
-### `add_contact(public_key, display_name=None)`
+#### `add_contact(public_key, display_name=None)`
 
 Send a contact request or approve an existing contact request. The mode depends on how the contact shows up in [`contacts`](./account.md#contacts). Best practice would be to look at the the following [`contacts`](./account.md#contacts) keys:
 
@@ -292,7 +326,7 @@ account.add_contact(
 )
 ```
 
-### `remove_contact(public_key)`
+#### `remove_contact(public_key)`
 
 Remove a contact or decline a pending contact request. The mode depends on how the contact shows up in [`contacts`](./account.md#contacts). Best practice would be to look at the the following [`contacts`](./account.md#contacts) keys:
 
@@ -336,7 +370,7 @@ removed = account.remove_contact(contact["public_key"])
 print(f"Removed: {removed}")
 ```
 
-### `send_request_community(url)`
+#### `send_request_community(url)`
 
 Send a request to join a community using its invitation URL. The method parses the shared Status community URL and submits a join request using the currently logged-in account. The account's [wallet address](./account.md#info) is provided to the community.
 
@@ -362,27 +396,10 @@ account.send_request_community(
     "https://status.app/c/community-invite-link"
 )
 ```
-### `backup()`
 
-Create a **local backup file** (`.bkp`) for the currently logged‑in account. The backup is generated by the Status Backend and stored inside the configured Docker backup volume. Each file is uniquely associated with an account. If the backup creation fails, an **exception will be raised**.
+### Wallet
 
-Returns `str` representing the **Docker path** of the generated backup file. The returned path refers to the **Docker container path** where the backup was created. If the backup directory is mounted as a Docker volume, the file will also appear on the host machine in the mapped folder.
-
-```python
-from bot import Account
-
-account = Account()
-params = {
-    "display_name": "status-app-bot",
-    "password": "SNTPUMP"
-}
-account.login(**params)
-
-backup_path = account.backup()
-print(f"Backup created at: {backup_path}")
-```
-
-### `get_tokens()`
+#### `get_tokens()`
 
 Retrieve all tokens available in Status Backend across all supported chains.
 
@@ -412,7 +429,7 @@ account.login(**params)
 available_tokens = account.get_tokens()
 ```
 
-### `get_balance(token_addresses, chain_ids=1, wallets=None, ccy=None)`
+#### `get_balance(token_addresses, chain_ids=1, wallets=None, ccy=None)`
 
 Retrieve token balances for one or more wallets across specified chains. This method supports querying multiple tokens, chains, and wallets. Balances are adjusted using token decimals. Optionally, values can be converted to fiat currencies.
 
@@ -539,7 +556,7 @@ ccy = ["GBP", "USD"] # Can be a single str value as well
 data = account.get_balance(token_addresses, chain_ids, wallets, ccy)
 ```
 
-### `get_market(token_addresses, chain_ids=1, ccy="USD")`
+#### `get_market(token_addresses, chain_ids=1, ccy="USD")`
 
 Retrieve market data for one or more tokens across specified chains. 
 
@@ -616,167 +633,6 @@ account.login(**params)
 
 print(account.info)
 ```
-
-### `contacts`
-
-This property returns contacts that have interacted with the account, including:
-
-- active contacts.
-- users who sent a contact request.
-- users whose contact request was sent by the bot.
-- contacts that were previously removed. If the contact is removed on both sides then it might disappear from the property.
-
-The property always fetches the latest state directly from the Status Backend. The lifecycle is as follows:
-  - `none` - no relationship
-  - `sent` - request sent by this account
-  - `received` - request received from another account
-  - `mutual` - both users have added each other
-
-Returns `dict[str, dict]` where the key is the contact's **public key**. This makes internal searching for account specific information faster.
-
-| Key | Type | Description |
-|----|----|-------------|
-| `public_key` | `str` | Public key that uniquely identifies the contact. |
-| `url` | `str` | The URL that can be shared with other users. |
-| `chat_id` | `str` | Chat identifier used for direct messaging. |
-| `key_uid` | `str` | Internal compressed key identifier used by Status Backend. |
-| `emojis` | `str` | Emoji hash associated with the contact identity. |
-| `contact_state` | `str` | Current state of the contact relationship (`none`, `mutual`, `sent`, `received`, `dismissed`). |
-| `external_contact_state` | `str` | How the contact relationship appears from the other user's perspective. |
-| `has_added_us` | `bool` | Whether the other user has added this account as a contact. |
-| `added` | `bool` | Whether this account has added the other user as a contact. |
-| `mutual` | `bool` | Whether both users have added each other. |
-| `display_name` | `str` | The current display name of the contact. |
-| `bio` | `str` | The contact's profile bio. |
-| `wallet_address` | `str` | Ethereum wallet address associated with the contact. |
-| `last_updated` | `datetime.datetime` | Timestamp when the contact information was last updated. |
-
-```python
-from bot import Account
-
-account = Account()
-params = {
-    "display_name": "status-app-bot",
-    "password": "SNTPUMP"
-}
-account.login(**params)
-
-contacts = account.contacts
-
-for contact in contacts.values():
-    print(contact["display_name"], contact["contact_state"])
-```
-
-### `communities`
-
-Get all communities that the account is currently a member of. This property always fetches the **latest community state** directly from the Status Backend. This ensures dynamic values such as community metadata, members, and channel permissions are always up to date.
-
-Each community contains information about:
-
-- community metadata (name, description, tags)
-- membership status
-- number of members
-- available channels and their permissions
-
-Returns `list[dict]` where each element represents a community.
-
-| Key | Type | Description |
-|----|----|-------------|
-| `id` | `str` | Unique identifier of the community. |
-| `url` | `str` | The URL that can be shared with other users. |
-| `name` | `str` | Name of the community. |
-| `verified` | `bool` | Whether the community is verified. |
-| `description` | `str` | Community description. |
-| `dialog` | `str` | Intro message shown when joining the community. |
-| `leaving_message` | `str` | Message shown when leaving the community. |
-| `tags` | `list[str]` | Tags associated with the community. |
-| `is_member` | `bool` | Whether the account is currently a member of the community. |
-| `joined_timestamp` | `datetime.datetime` | Timestamp when the account joined the community. |
-| `requested_timestamp` | `datetime.datetime` | Timestamp when the join request was submitted. |
-| `encrypted` | `bool` | Whether the community messaging is encrypted. |
-| `members` | `int` | Total number of community members. |
-| `channels` | `list[dict]` | List of channels available in the community. |
-
-Each channel contains:
-
-| Key | Type | Description |
-|----|----|-------------|
-| `id` | `str` | Channel identifier inside the community. |
-| `chat_id` | `str` | Combined community + channel ID used for sending messages. |
-| `url` | `str` | The URL that can be shared with other users. |
-| `name` | `str` | Channel name. |
-| `description` | `str` | Channel description. |
-| `permissions` | `dict` | Permissions for the channel. |
-
-Channel `id` values can be used directly with [`send_message`](./account.md#send_messagechat_id-message)
-
-Channel permissions:
-
-| Key | Type | Description |
-|----|----|-------------|
-| `posting` | `bool` | Whether the account can post messages in the channel. |
-| `viewing` | `bool` | Whether the account can view messages in the channel. |
-| `reactions` | `bool` | Whether the account can react to messages. |
-| `token_gated` | `bool` | Whether the channel requires a token to participate. |
-
-```python
-from bot import Account
-
-account = Account()
-account.login("status-app-bot", "SNTPUMP")
-
-for community in account.communities:
-    print(community["name"], community["members"])
-
-    for channel in community["channels"]:
-        print(f"\t#{channel['name']} posting: {channel['permissions']['posting']}")
-```
-
-### `chats`
-
-Get all chats that the account can **send messages to**. This includes:
-- [`contacts`](./account.md#contacts) — direct messages with users
-- [`communities`](./account.md#communities) — community channels where the account has **posting permission**
-- Group chats that the account is in
-
-Returns `list[dict]` where each `dict` represents a chat that can be used with [`send_message`](./account.md#send_messagechat_id-message) and [`get_messages`](./account.md#get_messageschat_id-start_timestampnone-end_timestampnone).
-
-| Key | Type | Description |
-|----|----|-------------|
-| `type` | `str` | Type of chat (`contact`, `channel` or `group_chat`). |
-| `id` | `str` | Chat identifier used when sending messages. |
-| `name` | `str` | Either the display name of the user or the community channel name. |
-
-```python
-from bot import Account
-
-account = Account()
-params = {
-    "display_name": "status-app-bot",
-    "password": "SNTPUMP"
-}
-account.login(**params)
-
-# This is under the assumption you already have a contact / joined a community
-for chat in account.chats:
-    print(f"{chat['type']}\t{chat['name']}\t{chat['id']}")
-```
-
-### `signal`
-
-The property exists in `Account` because signals require an **active logged‑in session**. Attempting to use signals before calling `login()` will raise an exception. Signals are low‑level events emitted by the Status Backend. Examples include:
-
-- `messages.new`
-- `message.delivered`
-- `node.ready`
-- `node.started`
-- `node.login`
-- `node.stopped`
-
-The property exposes two primary methods:
-
-- `signal.get()` — fetch a single event. If the event is not found, you may end up in an infinite loop.
-- `signal.listen()` — stream events continuously. Example usage of this is found in [`listen_messages()`](./account.md#listen_messages)
 
 ### `display_name`
 
@@ -872,6 +728,22 @@ account.login(**params)
 del account.bio
 ```
 
+### `signal`
+
+The property exists in `Account` because signals require an **active logged‑in session**. Attempting to use signals before calling `login()` will raise an exception. Signals are low‑level events emitted by the Status Backend. Examples include:
+
+- `messages.new`
+- `message.delivered`
+- `node.ready`
+- `node.started`
+- `node.login`
+- `node.stopped`
+
+The property exposes two primary methods:
+
+- `signal.get()` — fetch a single event. If the event is not found, you may end up in an infinite loop.
+- `signal.listen()` — stream events continuously. Example usage of this is found in [`listen_messages()`](./account.md#listen_messages)
+
 ### `logger`
 
 Provides access to the internal **Python logger** for monitoring the lifecycle of the account and backend operations such as login, account creation, messenger startup, and recovery.
@@ -896,7 +768,156 @@ account.logger.warning("This is a warning")
 account.logger.error("Something went wrong")
 ```
 
-### `chains`
+### Chat
+
+#### `contacts`
+
+This property returns contacts that have interacted with the account, including:
+
+- active contacts.
+- users who sent a contact request.
+- users whose contact request was sent by the bot.
+- contacts that were previously removed. If the contact is removed on both sides then it might disappear from the property.
+
+The property always fetches the latest state directly from the Status Backend. The lifecycle is as follows:
+  - `none` - no relationship
+  - `sent` - request sent by this account
+  - `received` - request received from another account
+  - `mutual` - both users have added each other
+
+Returns `dict[str, dict]` where the key is the contact's **public key**. This makes internal searching for account specific information faster.
+
+| Key | Type | Description |
+|----|----|-------------|
+| `public_key` | `str` | Public key that uniquely identifies the contact. |
+| `url` | `str` | The URL that can be shared with other users. |
+| `chat_id` | `str` | Chat identifier used for direct messaging. |
+| `key_uid` | `str` | Internal compressed key identifier used by Status Backend. |
+| `emojis` | `str` | Emoji hash associated with the contact identity. |
+| `contact_state` | `str` | Current state of the contact relationship (`none`, `mutual`, `sent`, `received`, `dismissed`). |
+| `external_contact_state` | `str` | How the contact relationship appears from the other user's perspective. |
+| `has_added_us` | `bool` | Whether the other user has added this account as a contact. |
+| `added` | `bool` | Whether this account has added the other user as a contact. |
+| `mutual` | `bool` | Whether both users have added each other. |
+| `display_name` | `str` | The current display name of the contact. |
+| `bio` | `str` | The contact's profile bio. |
+| `wallet_address` | `str` | Ethereum wallet address associated with the contact. |
+| `last_updated` | `datetime.datetime` | Timestamp when the contact information was last updated. |
+
+```python
+from bot import Account
+
+account = Account()
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
+
+contacts = account.contacts
+
+for contact in contacts.values():
+    print(contact["display_name"], contact["contact_state"])
+```
+
+#### `communities`
+
+Get all communities that the account is currently a member of. This property always fetches the **latest community state** directly from the Status Backend. This ensures dynamic values such as community metadata, members, and channel permissions are always up to date.
+
+Each community contains information about:
+
+- community metadata (name, description, tags)
+- membership status
+- number of members
+- available channels and their permissions
+
+Returns `list[dict]` where each element represents a community.
+
+| Key | Type | Description |
+|----|----|-------------|
+| `id` | `str` | Unique identifier of the community. |
+| `url` | `str` | The URL that can be shared with other users. |
+| `name` | `str` | Name of the community. |
+| `verified` | `bool` | Whether the community is verified. |
+| `description` | `str` | Community description. |
+| `dialog` | `str` | Intro message shown when joining the community. |
+| `leaving_message` | `str` | Message shown when leaving the community. |
+| `tags` | `list[str]` | Tags associated with the community. |
+| `is_member` | `bool` | Whether the account is currently a member of the community. |
+| `joined_timestamp` | `datetime.datetime` | Timestamp when the account joined the community. |
+| `requested_timestamp` | `datetime.datetime` | Timestamp when the join request was submitted. |
+| `encrypted` | `bool` | Whether the community messaging is encrypted. |
+| `members` | `int` | Total number of community members. |
+| `channels` | `list[dict]` | List of channels available in the community. |
+
+Each channel contains:
+
+| Key | Type | Description |
+|----|----|-------------|
+| `id` | `str` | Channel identifier inside the community. |
+| `chat_id` | `str` | Combined community + channel ID used for sending messages. |
+| `url` | `str` | The URL that can be shared with other users. |
+| `name` | `str` | Channel name. |
+| `description` | `str` | Channel description. |
+| `permissions` | `dict` | Permissions for the channel. |
+
+Channel `id` values can be used directly with [`send_message`](./account.md#send_messagechat_id-message)
+
+Channel permissions:
+
+| Key | Type | Description |
+|----|----|-------------|
+| `posting` | `bool` | Whether the account can post messages in the channel. |
+| `viewing` | `bool` | Whether the account can view messages in the channel. |
+| `reactions` | `bool` | Whether the account can react to messages. |
+| `token_gated` | `bool` | Whether the channel requires a token to participate. |
+
+```python
+from bot import Account
+
+account = Account()
+account.login("status-app-bot", "SNTPUMP")
+
+for community in account.communities:
+    print(community["name"], community["members"])
+
+    for channel in community["channels"]:
+        print(f"\t#{channel['name']} posting: {channel['permissions']['posting']}")
+```
+
+#### `chats`
+
+Get all chats that the account can **send messages to**. This includes:
+- [`contacts`](./account.md#contacts) — direct messages with users
+- [`communities`](./account.md#communities) — community channels where the account has **posting permission**
+- Group chats that the account is in
+
+Returns `list[dict]` where each `dict` represents a chat that can be used with [`send_message`](./account.md#send_messagechat_id-message) and [`get_messages`](./account.md#get_messageschat_id-start_timestampnone-end_timestampnone).
+
+| Key | Type | Description |
+|----|----|-------------|
+| `type` | `str` | Type of chat (`contact`, `channel` or `group_chat`). |
+| `id` | `str` | Chat identifier used when sending messages. |
+| `name` | `str` | Either the display name of the user or the community channel name. |
+
+```python
+from bot import Account
+
+account = Account()
+params = {
+    "display_name": "status-app-bot",
+    "password": "SNTPUMP"
+}
+account.login(**params)
+
+# This is under the assumption you already have a contact / joined a community
+for chat in account.chats:
+    print(f"{chat['type']}\t{chat['name']}\t{chat['id']}")
+```
+
+### Wallet
+
+#### `chains`
 
 Retrieve all **production blockchain networks** available in Status Backend. This property returns a mapping between `chain_id` and the corresponding **chain name**.
 
