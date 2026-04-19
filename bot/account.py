@@ -900,7 +900,7 @@ class Account:
         """
         for file_name in os.listdir(self.__backup_local_folder):
             params = {
-                "filePath": os.path.join(self.__docker_backup_folder, file_name)
+                "filePath": os.path.join(self.__docker_backup_folder, file_name).replace("\\", "/")
             }
             self.logger.info(f"Trying to load {file_name}")
             response = requests.post(self.__urls["http"]["load_backup"], json=params)
