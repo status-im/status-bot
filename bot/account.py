@@ -106,7 +106,7 @@ class Account:
         else:
             available_key_uids = [current["key_uid"] for current in available_accounts]
             if key_uid not in available_key_uids:
-                info = "\n".join([f"{current['key_uid']} - {current['display_name']}" for current in self.__available_accounts])
+                info = "\n".join([f"{current['key_uid']} - {current['display_name']}" for current in self.available_accounts])
                 raise ValueError(f"Given Key Unique Identifier is invalid...\nAvailable Key Unique Identifiers:\n{info}")
 
         is_new_account = isinstance(key_uid, type(None))
@@ -155,6 +155,11 @@ class Account:
             self.__is_wallet_set = True
 
         url = self.__urls["http"][url_key]
+        params.update({
+            "logEnabled": True,
+            "logToStderr": True,
+            "logLevel": "INFO",
+        })
         response = requests.post(url, json=params)
         signal_event = self.__signal.get("node.login")
         if signal_event["is_error"]:
