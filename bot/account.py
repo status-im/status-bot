@@ -1,5 +1,6 @@
 from typing import Optional, Union, Generator, Any
 import requests, datetime, re, logging, os
+import pandas as pd
 from .signal import Signal
 from .logger import Logger
 class Account:
@@ -16,7 +17,9 @@ class Account:
     }
     __prefix_mapping = {
         "messaging": "wakuext",
-        "urls": "sharedurls"
+        "urls": "sharedurls",
+        "wallets": "wallet",
+        "account": "accounts"
     }
     def __init__(self, domain: str = "localhost", port: int = 8080, is_secure: bool = False):
         """
@@ -41,30 +44,40 @@ class Account:
         self.__is_messenger_launched = False
         # Information for the logged in account
         self.__info = {}
-        self.http_base_url = f"http{'s' if is_secure else ''}://{domain}:{port}/statusgo/"
-        self.ws_base_url = f"ws://{domain}:{port}/"
-        self.urls = {
+        # Information for Production chains (chain id -> chain name)
+        self.__chains = {}
+        # Monitor if wallet is used in `login` and raise an exception if
+        # a RPC endpoint for `wallet` is called without `infura_token`
+        self.__is_wallet_set = False
+        # All available tokens in Status Backend
+        self.__available_tokens = pd.DataFrame()
+        # All available ISO 4217 currencies
+        self.__iso4217_ccy = []
+        # All tokens in Status Backend
+        self.__http_base_url = f"http{'s' if is_secure else ''}://{domain}:{port}/statusgo/"
+        self.__ws_base_url = f"ws://{domain}:{port}/"
+        self.__urls = {
             "http": {
-                "initialize": f"{self.http_base_url}InitializeApplication",
-                "login": f"{self.http_base_url}LoginAccount",
-                "create": f"{self.http_base_url}CreateAccountAndLogin",
-                "restore": f"{self.http_base_url}RestoreAccountAndLogin",
-                "logout": f"{self.http_base_url}Logout",
-                "create_backup": f"{self.http_base_url}PerformLocalBackup",
-                "load_backup": f"{self.http_base_url}LoadLocalBackup",
-                "rpc": f"{self.http_base_url}CallRPC",
+                "initialize": f"{self.__http_base_url}InitializeApplication",
+                "login": f"{self.__http_base_url}LoginAccount",
+                "create": f"{self.__http_base_url}CreateAccountAndLogin",
+                "restore": f"{self.__http_base_url}RestoreAccountAndLogin",
+                "logout": f"{self.__http_base_url}Logout",
+                "create_backup": f"{self.__http_base_url}PerformLocalBackup",
+                "load_backup": f"{self.__http_base_url}LoadLocalBackup",
+                "rpc": f"{self.__http_base_url}CallRPC",
             },
             "socket": {
-                "signals": f"{self.ws_base_url}signals"
+                "signals": f"{self.__ws_base_url}signals"
             }
         }
-        self.__signal = Signal(self.urls["socket"]["signals"])
+        self.__signal = Signal(self.__urls["socket"]["signals"])
         # Initialize profile
         self.available_accounts
         # In case if there is a hanging logged in session
         self.logout()
 
-    def login(self, password: str, key_uid: Optional[str] = None, display_name: Optional[str] = None, mnemonic: Optional[str] = None):
+    def login(self, password: str, key_uid: Optional[str] = None, display_name: Optional[str] = None, mnemonic: Optional[str] = None, infura_token: Optional[str] = None, coingecko_api_key: Optional[str] = None):
         """
         Login to the given account. If it does not exist,
         it will be created and automatically logged in.
@@ -74,6 +87,8 @@ class Account:
             - `key_uid` - your key unique identifier. If not provided `display_name` will be used to fetch it. This means that each `display_name` can be linked to one `key_uid`
             - `display_name` - your Status display name. Use `display_name` and `password` parameter combination if you have a 1 to 1 mapping (each display name has a unique `key_uid`)
             - `mnemonic` - the mnemonic when creating an account. Use this field with `password` and `display_name` to recover an account
+            - `infura_token` - https://www.infura.io/ RPC token to allow Status Backend to use a wallet
+            - `coingecko_api_key` - https://www.coingecko.com/ API key to allow Status Backend to use a wallet
         """
         if not key_uid and not display_name:
             raise ValueError("Please provide either a Key Unique Identifier (key_uid) or a Display Name (display_name)...")
@@ -91,7 +106,7 @@ class Account:
         else:
             available_key_uids = [current["key_uid"] for current in available_accounts]
             if key_uid not in available_key_uids:
-                info = "\n".join([f"{current['key_uid']} - {current['display_name']}" for current in self.__available_accounts])
+                info = "\n".join([f"{current['key_uid']} - {current['display_name']}" for current in self.available_accounts])
                 raise ValueError(f"Given Key Unique Identifier is invalid...\nAvailable Key Unique Identifiers:\n{info}")
 
         is_new_account = isinstance(key_uid, type(None))
@@ -128,7 +143,23 @@ class Account:
             self.logger.info(f"Restoring account for given mnemonics")
 
         self.logout()
-        url = self.urls["http"][url_key]
+
+        # Wallet usage
+        if infura_token:
+            params["infuraToken"] = infura_token
+
+        if coingecko_api_key:
+            params["coingeckoApiKey"] = coingecko_api_key
+
+        if infura_token and coingecko_api_key:
+            self.__is_wallet_set = True
+
+        url = self.__urls["http"][url_key]
+        params.update({
+            "logEnabled": True,
+            "logToStderr": True,
+            "logLevel": "INFO",
+        })
         response = requests.post(url, json=params)
         signal_event = self.__signal.get("node.login")
         if signal_event["is_error"]:
@@ -164,9 +195,10 @@ class Account:
         """
         Logout of Status app. In a way this method behaves as a Status cleaner
         """
-        response = requests.post(self.urls["http"]["logout"])
+        response = requests.post(self.__urls["http"]["logout"])
         self.__info = {}
         self.__is_messenger_launched = False
+        self.__is_wallet_set = False
         return self
 
     @property
@@ -178,7 +210,7 @@ class Account:
         """
         All locally available accounts
         """
-        response = requests.post(self.urls["http"]["initialize"], json={
+        response = requests.post(self.__urls["http"]["initialize"], json={
             "dataDir": self.__docker_data_folder
         })
         data: dict = response.json()
@@ -311,6 +343,7 @@ class Account:
     def communities(self) -> list[dict]:
         """
         Get the communities that the bot is in.
+
         NOTE: We do not use internal state so we can get dynamic values such as:
         - Current community description
         - Current number of community members
@@ -388,6 +421,84 @@ class Account:
             if active_chat["chatType"] == 3
         ]
         return contacts + communities + group_chats
+
+    @property
+    def chains(self) -> dict[int, str]:
+        """
+        All available production chains that are
+        used in Status Backend.
+        """
+
+        # NOTE: An internal state can be used because chains
+        # would be consistent for the currently pulled Status Bacckend image
+        if self.__chains:
+            return self.__chains
+
+        result = self.__call_rpc("wallets", "getEthereumChains").get("result", [])
+        key = "Prod"
+        self.__chains = {chain[key]["chainId"]: chain[key]["chainName"] for chain in result if chain.get(key)}
+        return self.__chains
+
+    @property
+    def balance(self) -> pd.DataFrame:
+        """
+        Get the account's balance
+        """
+        empty = pd.DataFrame(columns=["timestamp", "address", "chain_id", "amount", "symbol"])
+
+        params = [[self.info["wallet_address"]], True]
+        results = self.__call_rpc("wallets", "fetchOrGetCachedWalletBalances", params).get("result", {}).get(self.info["wallet_address"].lower(), [])
+        if not results:
+            return empty.copy()
+
+        balance = pd.DataFrame(results)
+        column_mapping = {"tokenAddress": "address", "tokenChainId": "chain_id", "balance": "amount", "hasError": "error"}
+        balance = balance.rename(columns=column_mapping)[list(column_mapping.values())]\
+                        .astype({"chain_id": "int8", "amount": "float64"})
+
+        query = (balance["amount"] != 0) & (~balance["error"])
+        if query.sum() == 0:
+            return empty.copy()
+
+        redundant_columns = ["error", "decimals", "cross_chain_id", "source_id"]
+        available_tokens = self.get_tokens()
+        balance = balance.loc[query].merge(available_tokens, "left", ["address", "chain_id"])\
+                                    .drop(redundant_columns, axis=1)\
+                                    .drop_duplicates()\
+                                    .sort_values("chain_id", ascending=True)\
+                                    .reset_index(drop=True)\
+
+        balance.insert(0, "timestamp", datetime.datetime.now())
+        return balance.copy()
+
+    def __getitem__(self, key: str) -> pd.DataFrame:
+        """
+        Get the fiat currency balance
+        """
+        ccy = key.upper()
+
+        if ccy not in self.__get_fiat_ccy():
+            raise Exception(f"{ccy} is an invalid fiat (ISO 4217) currency code...")
+
+        balance = self.balance
+        tokens = (balance["chain_id"].astype(str) + "-" + balance["address"]).to_list()
+
+        result = self.__call_rpc("wallets", "fetchPrices", [tokens, [ccy]]).get("result", {})
+        if not result:
+            return pd.DataFrame()
+        rates = pd.DataFrame([
+            {
+                "chain_id": int(address.split("-")[0]),
+                "address": address.split("-")[1],
+                "rate": price,
+                "ccy": ccy,
+            }
+            for address, prices in result.items()
+            for ccy, price in prices.items()
+        ])
+        balance = balance.merge(rates, "left", ["chain_id", "address"])
+        balance["fiat_value"] = balance["amount"] * balance["rate"]
+        return balance.copy()
 
     def send_message(self, chat_id: str, message: str):
         """
@@ -479,6 +590,9 @@ class Account:
             - `public_key` - the contact's public key
             - `display_name` - this field is required if the `public_key` does not appear in your contacts. This will set their display name (can be different from the one the other user has chosen)
         """
+        if public_key == self.info["public_key"]:
+            return self
+
         contacts = list(self.contacts.values())
         if not display_name:
             for contact in contacts:
@@ -551,7 +665,7 @@ class Account:
             - the Docker backup path (linked to a volume). The file name is unique per account.
         """
         self.info
-        response = requests.post(self.urls["http"]["create_backup"])
+        response = requests.post(self.__urls["http"]["create_backup"])
         result: dict = response.json()
         file_path = result.get("filePath")
 
@@ -559,6 +673,196 @@ class Account:
             raise Exception(f"There was an error with creating a backup for {self.info['display_name']}")
 
         return file_path
+
+    def get_tokens(self) -> pd.DataFrame:
+        """
+        Get all tokens that can be used in Status.
+
+        Output:
+            - DataFrame of all tokens
+        """
+        if len(self.__available_tokens) > 0:
+            return self.__available_tokens.copy()
+
+        columns = ["chainId", "address", "symbol", "decimals", "crossChainId"]
+        info = []
+        result: list[dict] = self.__call_rpc("wallets", "getAllTokenLists").get("result", [])
+        for current in result:
+            if len(current["tokens"]) == 0:
+                continue
+            data = pd.DataFrame(current["tokens"])[columns]
+            data = data.assign(
+                decimals = data["decimals"].astype("int8"),
+                chainId = data["chainId"].astype("int8"),
+                crossChainId = data["crossChainId"].apply(lambda value: None if len(value) == 0 else value),
+                source_id = current["name"]
+            )
+            info.append(data)
+
+        if info:
+            self.__available_tokens = pd.concat(info, ignore_index=True)
+            self.__available_tokens.columns = [self.__camel_to_snake(column) for column in self.__available_tokens.columns]
+
+        return self.__available_tokens.copy()
+
+    def get_balance(self, token_addresses: Union[list[str], str], chain_ids: Union[list[int], int] = 1, wallets: Optional[Union[list[str], str]] = None, ccy: Optional[Union[str, list[str]]] = None) -> pd.DataFrame:
+        """
+        Get the current amount for the provided token addresses, chain IDs and wallets.
+
+        Parameters:
+            - `token_addresses` - the token addresses as they appear in `get_tokens()`
+            - `chain_ids` - chain IDs as they appear in `self.chains`
+            - `wallets` - if left blank, the account's `wallet_address` will be used. However other wallets can be monitored as well.
+            - `ccy` - the fiat currency the tokens will be converted to.
+
+        Output:
+            - DataFrame containing the current balance and fiat amount (if `ccy` is provided)
+        """
+
+        if isinstance(wallets, str):
+            wallets = [wallets]
+
+        elif isinstance(wallets, type(None)):
+            wallets = [self.info["wallet_address"]]
+
+        if isinstance(wallets, list):
+            wallets = list(set(wallets))
+
+        if isinstance(token_addresses, str):
+            token_addresses = [token_addresses]
+
+        if isinstance(token_addresses, list):
+            token_addresses = list(set(token_addresses))
+
+        if isinstance(chain_ids, int):
+            chain_ids = [chain_ids]
+
+        if isinstance(ccy, str):
+            ccy = [ccy]
+        elif isinstance(ccy, type(None)):
+            ccy = []
+
+        if ccy:
+            ccy = [
+                current.upper()
+                for current in ccy
+                if current.upper() in self.__get_fiat_ccy()
+            ]
+
+        tokens = self.__get_valid_tokens(chain_ids, token_addresses)
+
+        result: dict[str, dict[str, dict[str, str]]] = self.__call_rpc("wallets", "getBalancesByChain", [wallets, tokens]).get("result", {})
+        data = [
+            {
+                "chain_id": int(chain_id),
+                "wallet_address": wallet_address,
+                "token_address": token_address,
+                "amount": token_hex_amount,
+            }
+            for chain_id, chain_info in result.items()
+            for wallet_address, wallet_info in chain_info.items()
+            for token_address, token_hex_amount in wallet_info.items()
+        ]
+
+        if not data:
+            return pd.DataFrame()
+
+        data = pd.DataFrame(data)
+        available_tokens = self.get_tokens()
+        column_mapping = {"chain_id": "chain_id", "address": "token_address", "symbol": "token_symbol", "decimals": "decimals"}
+        data: pd.DataFrame = data.merge(
+            available_tokens[list(column_mapping.keys())].rename(columns=column_mapping).drop_duplicates(),
+            "left",
+            ["chain_id", "token_address"]
+        )
+        final_columns = ["timestamp", "wallet_address", "token_address", "token_symbol", "amount", "chain_id"]
+        data = data.assign(
+            timestamp = datetime.datetime.now(),
+            chain_id = data["chain_id"].astype("int8"),
+            amount = data.apply(lambda row: int(row["amount"], 16) / (10 ** row["decimals"]), axis=1)
+        )[final_columns]
+
+        if not ccy:
+            return data.copy()
+
+        result = self.__call_rpc("wallets", "fetchPrices", [tokens, ccy]).get("result", {})
+        if not result:
+            return data.copy()
+
+        rates = pd.DataFrame([
+            {
+                "chain_id": int(address.split("-")[0]),
+                "token_address": address.split("-")[1],
+                "ccy": ccy,
+                "price": price
+            }
+            for address, prices in result.items()
+            for ccy, price in prices.items()
+        ])
+        data = data.merge(rates, "outer", ["chain_id", "token_address"])
+        return data
+
+    def get_market(self, token_addresses: Union[list[str], str], chain_ids: Union[list[int], int] = 1, ccy: str = "USD") -> pd.DataFrame:
+        """
+        Get market information for the provided token addresses and chain IDs.
+
+        Parameters:
+            - `token_addresses` - the token addresses as they appear in `get_tokens()`
+            - `chain_ids` - chain IDs as they appear in `self.chains`
+            - `ccy` - the fiat currency the market values will be fetched for.
+
+        Output:
+            - DataFrame containing the current market values and fiat amount
+        """
+        if isinstance(token_addresses, str):
+            token_addresses = [token_addresses]
+
+        if isinstance(token_addresses, list):
+            token_addresses = list(set(token_addresses))
+
+        if isinstance(chain_ids, int):
+            chain_ids = [chain_ids]
+
+        ccy = ccy.upper()
+        available_ccy = self.__get_fiat_ccy()
+        if ccy not in available_ccy:
+            raise Exception(f"Given currency {ccy} is invalid...\nAvailable ISO 4217 currencies: {available_ccy}")
+
+        tokens = self.__get_valid_tokens(chain_ids, token_addresses)
+        market_info = pd.DataFrame([
+            {
+                "chain_id": int(token_address.split("-")[0]),
+                "address": token_address.split("-")[1],
+                "currency": ccy,
+                **info
+            }
+            for token_address, info in self.__call_rpc("wallets", "fetchMarketValues", [tokens, ccy]).get("result", {}).items()
+        ])
+        market_info: pd.DataFrame = market_info.assign(
+            timestamp = datetime.datetime.now(),
+            chain_id = market_info["chain_id"].astype("int8")
+        )
+        market_info = market_info.merge(
+            self.get_tokens()[["chain_id", "address", "symbol"]].drop_duplicates(),
+            "left",
+            ["chain_id", "address"]
+        )
+        column_mapping = {
+            "timestamp": "timestamp",
+            "chain_id": "chain_id",
+            "address": "token_address",
+            "symbol": "token_symbol",
+            "currency": "fiat_ccy",
+            "MKTCAP": "market_cap",
+            "HIGHDAY": "high_price",
+            "LOWDAY": "low_price",
+            "CHANGE24HOUR": "pnl_24hr",
+            "CHANGEPCTDAY": "pct_change",
+            "CHANGEPCTHOUR": "pct_change_1hr",
+            "CHANGEPCT24HOUR": "pct_change_24hr"
+        }
+        market_info = market_info.rename(columns=column_mapping)[list(column_mapping.values())]
+        return market_info.copy()
 
     def __start_messenger(self):
         """
@@ -601,10 +905,10 @@ class Account:
         """
         for file_name in os.listdir(self.__backup_local_folder):
             params = {
-                "filePath": os.path.join(self.__docker_backup_folder, file_name)
+                "filePath": os.path.join(self.__docker_backup_folder, file_name).replace("\\", "/")
             }
             self.logger.info(f"Trying to load {file_name}")
-            response = requests.post(self.urls["http"]["load_backup"], json=params)
+            response = requests.post(self.__urls["http"]["load_backup"], json=params)
             error: str = response.json().get("error", "")
             if len(error) == 0:
                 self.__signal.get("messages.new")
@@ -632,6 +936,9 @@ class Account:
         if not name:
             raise ValueError(f"Name {name} does not exist... Available options: {list(self.__prefix_mapping.keys())}")
 
+        if name == "wallet" and not self.__is_wallet_set:
+            raise Exception(f"Cannot use this method without setting an `infura_token` and `coingecko_api_key` when calling `login`.")
+
         data = {
             'jsonrpc': '2.0',
             # NOTE: Waku may be renamed to Logos Messaging (or something similar)
@@ -641,8 +948,45 @@ class Account:
         if params:
             data["params"] = params
 
-        response = requests.get(self.urls["http"]["rpc"], json=data)
+        response = requests.get(self.__urls["http"]["rpc"], json=data)
         return response.json()
+
+    def __get_fiat_ccy(self) -> list[str]:
+        """
+        Get the fiat currency symbols that Status has access to
+
+        https://www.iso.org/iso-4217-currency-codes.html
+        https://www.iban.com/currency-codes
+
+        Output:
+            - list of all fiat currency symbols
+        """
+        if self.__iso4217_ccy:
+            return self.__iso4217_ccy
+
+        self.__iso4217_ccy = [
+            ccy.upper()
+            for ccy in self.__call_rpc("wallets", "getCachedCurrencyFormats").get("result", {}).keys()
+            if len(ccy) == 3 and ccy.upper() != "XXX"
+        ]
+        return self.__iso4217_ccy
+
+    def __get_valid_tokens(self, chain_ids: list[int], token_addresses: list[str]) -> list[str]:
+        available_chains = list(self.chains.keys())
+        available_tokens = self.get_tokens()
+        tokens = []
+        for chain_id in chain_ids:
+
+            if chain_id not in available_chains:
+                continue
+
+            query = available_tokens["address"].isin(token_addresses) & (available_tokens["chain_id"] == chain_id)
+            selected = available_tokens.loc[query].reset_index(drop=True).copy()
+            if len(selected) == 0:
+                continue
+
+            tokens += selected.apply(lambda row: f"{row['chain_id']}-{row['address']}", axis=1).unique().tolist()
+        return tokens
 
     def __camel_to_snake(self, name: str) -> str:
         """
