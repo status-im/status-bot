@@ -14,6 +14,8 @@ Monitoring tool for Status App communities.
 - `STATUS_DISPLAY_NAME` - The Status display name that will be used to create an account.
 - `STATUS_PASSWORD` - The Status password that will be used to create an account.
 - `STATUS_MNEMONIC` - The mnemonic used to recover the account. If passed a `.bkp` file will be loaded as well. Use this when you want to login to a bot account via Status App, join a community / leave community and export the `.bkp` file.
+- `STATUS_INFURA_TOKEN` - [Infura token](https://www.infura.io/) is required for **token gated communities**
+- `STATUS_COINGECKO_API_KEY` - [Coingecko API Key](https://www.coingecko.com/) is required for **token gated communities**
 
 ## Docker deployement
 
@@ -25,6 +27,10 @@ Example of `.env` file to use
 STATUS_DISPLAY_NAME = "bot-status"
 STATUS_PASSWORD = "ChangeThisPassword"
 STATUS_MNEMONIC= "test test test test test test test test test test test test"
+
+# Necessary for communities that have tokens
+STATUS_INFURA_TOKEN = "Token from https://www.infura.io/"
+STATUS_COINGECKO_API_KEY = "Token from https://www.coingecko.com/"
 
 # Database config
 POSTGRES_HOST=database
