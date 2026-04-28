@@ -402,7 +402,7 @@ class Account:
             {"type": "channel", "id": chat["chat_id"], "name": f"{community['name']} #{chat['name']}"}
             for community in self.communities
             for chat in community["channels"]
-            if chat["permissions"]["posting"]
+            if chat["permissions"]["posting"] and community["is_member"]
         ]
         contacts = [
             {"type": "contact", "id": contact["chat_id"], "name": contact["display_name"]}

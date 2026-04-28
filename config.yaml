@@ -5,7 +5,10 @@ postgres:
         community: "raw_community_info"
         members: "raw_community_activity"
 # Value must be in MINUTES
-sleep: 1440 # 1 day
+sleep: 10
+files:
+    # Get the latest community chat dates for next run
+    current_state: "dates.pkl"
 # Parameters based on Account class
 bot_params:
     # localhost - to run code locally with Status Backend Dockerfile

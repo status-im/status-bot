@@ -1,10 +1,23 @@
 import datetime, os, pickle, yaml, time
 import pandas as pd
+from typing import Any
 from pathlib import Path
 from dotenv import load_dotenv
 # Manual file imports
 from bot import Account, Logger
 from postgres import Postgres
+
+def to_midnight(timestamp: datetime.datetime) -> datetime.datetime:
+    """
+    Convert the given timestamp to midnight
+
+    Parameters:
+        - `timestamp` - current timestap
+
+    Output:
+        - `timestamp` at midnight
+    """
+    return timestamp.replace(minute=0, second=0, hour=0, microsecond=0)
 
 def load_config(file_path: str) -> dict:
     """
@@ -61,7 +74,7 @@ def extract_community_members(account: Account, community_id: str) -> pd.DataFra
 
     return pd.DataFrame()
 
-def extract_community_channels(account: Account, community: dict, start_timestamp: datetime.datetime, end_timestamp: datetime.datetime) -> pd.DataFrame:
+def extract_community_channels(account: Account, community: dict, latest_dates: dict[str, pd.Timestamp]) -> pd.DataFrame:
     """
     Extract the community channel messages.
 
@@ -76,23 +89,78 @@ def extract_community_channels(account: Account, community: dict, start_timestam
     """
     final = []
     for channel in community["channels"]:
-        messages = account.get_messages(channel["chat_id"], start_timestamp, end_timestamp)
 
+        now = datetime.datetime.now()
+        start_timestamp = latest_dates.get(channel["chat_id"])
+        if start_timestamp:
+            start_timestamp += datetime.timedelta(seconds=1)
+        else:
+            # Node will only return  known / fetched messages for this channel.
+            # Without enabling community archives feature the node can only fetch last 30 days (from store nodes).
+            start_timestamp = to_midnight(now - datetime.timedelta(days=30))
+
+        account.logger.info(f"Starting message extraction for # {channel['name']} [{start_timestamp} - {now}]")
+        messages = account.get_messages(channel["chat_id"], start_timestamp, now)
         messages = pd.DataFrame(messages)
         if len(messages) == 0:
-            account.logger.info(f"No messages found for # {channel['name']}")
+            account.logger.info(f"No messages found")
             continue
 
-        account.logger.info(f"Extracted {len(messages)} message(s) from # {channel['name']}")
+        account.logger.info(f"Extracted {len(messages)} message(s)")
         messages = messages.assign(
             community_id = community["id"],
-            extracted_timestamp = datetime.datetime.now()
+            extracted_timestamp = now
         )
         final.append(messages)
 
     return pd.concat(final, ignore_index=True) if final else pd.DataFrame()
 
-def download(folder: str, config: dict):
+def save_file(file_path: str, data: Any):
+    """
+    Save data to a pickle file. Creates directories if they don't exist.
+
+    Parameters:
+        - `file_path` - Full pikle path
+        - `data` - Python object to be saved
+    """
+    folder = os.path.dirname(file_path)
+    if len(folder) > 0:
+        os.makedirs(folder, exist_ok=True)
+
+    if isinstance(data, pd.DataFrame):
+        data.to_csv(file_path, index=False)
+        return
+
+    with open(file_path, "wb") as f:
+        pickle.dump(data, f)
+
+def create_bot(config: dict) -> Account:
+    """
+    Initialized a logged in bot account that will monitor the communities.
+
+    Parameters:
+        - `config` - the `load_config` configuration
+
+    Output:
+        - Logged in Bot account
+    """
+    account = Account(**config.get("bot_params", {}))
+    available_accounts = [acc["display_name"] for acc in account.available_accounts]
+
+    prefix = "STATUS_"
+    params = {
+        key.replace(prefix, "").lower(): value
+        for key, value in config["env_vars"].items()
+        if key.startswith(prefix)
+    }
+    if params["display_name"] in available_accounts:
+        params.pop("mnemonic")
+
+    account.login(**params)
+    account.logger.info(f"Account Information:\nCompressed Key: {account.info['compressed_key']}\nPublic Key: {account.info['public_key']}\nURL: {account.info['url']}")
+    return account
+
+def download(account: Account, folder: str, config: dict):
     """
     Download Status App messages / info from communities and store them in pickle files.
 
@@ -100,63 +168,48 @@ def download(folder: str, config: dict):
         - `folder` - the folder where the files will be created. Sub folders are automatically created
         - `config` - the `load_config` configuration
     """
-    account = Account(**config.get("bot_params", {}))
-    available_accounts = [acc["display_name"] for acc in account.available_accounts]
+    file_path = os.path.join(os.path.dirname(__file__), config["files"]["current_state"])
+    latest_dates: dict[str, pd.Timestamp] = pd.read_pickle(file_path) if os.path.exists(file_path) else {}
 
-    messages_folder = os.path.join(folder, "messages")
-    os.makedirs(messages_folder, exist_ok=True)
+    get_file_name = lambda: str(to_midnight(datetime.datetime.now()).timestamp()).replace(".", "")
+    communities = account.communities
+    if not communities:
+        account.logger.warning("No communities found...")
 
-    community_info_folder = os.path.join(folder, "community")
-    os.makedirs(community_info_folder, exist_ok=True)
+    for community in communities:
 
-    members_info_folder = os.path.join(folder, "members")
-    os.makedirs(members_info_folder, exist_ok=True)
+        if not community["is_member"]:
+            continue
 
-    prefix = "STATUS_"
-    params = {
-        key.replace(prefix, "").lower(): value
-        for key, value in os.environ.items()
-        if key.startswith(prefix)
-    }
-    if params["display_name"] in available_accounts:
-        params.pop("mnemonic")
+        community_folder_name = community["name"].replace(" ", "-")
+        messages_folder = os.path.join(folder, "messages", community_folder_name)
+        community_info_folder = os.path.join(folder, "community", community_folder_name)
+        members_info_folder = os.path.join(folder, "members", community_folder_name)
 
-    account.login(**params)
-
-    now = datetime.datetime.now()
-    # Node will only return  known / fetched messages for this channel.
-    # Without enabling community archives feature the node can only fetch last 30 days (from store nodes).
-    to_midnight = lambda date: date.replace(minute=0, second=0, hour=0, microsecond=0)
-    start_timestamp: datetime.datetime = to_midnight(now - datetime.timedelta(days=30))
-    end_timestamp: datetime.datetime = to_midnight(now - datetime.timedelta(days=1))
-
-    get_file_name = lambda: str(to_midnight(datetime.datetime.now()).timestamp()).replace(".", "") + ".pkl"
-
-    for community in account.communities:
-        account.logger.info(f"Extracting data for {community['name']} from {start_timestamp} to {end_timestamp}")
+        account.logger.info(f"Extracting data for {community['name']}")
         community["extracted_timestamp"] = datetime.datetime.now()
-        file_path = os.path.join(community_info_folder, get_file_name())
+
+        file_path = os.path.join(community_info_folder, get_file_name() + ".pkl")
 
         if not os.path.exists(file_path):
-            with open(file_path, "wb") as f:
-                pickle.dump(community, f)
+            save_file(file_path, community)
             account.logger.info(f"Created {file_path}")
 
-        file_path = os.path.join(members_info_folder, get_file_name())
+        file_path = os.path.join(members_info_folder, get_file_name() + ".csv")
         if not os.path.exists(file_path):
             members = extract_community_members(account, community["id"])
             if len(members) > 0:
-                members.to_pickle(file_path)
+                save_file(file_path, members)
                 account.logger.info(f"Created {file_path}")
 
-        file_path = os.path.join(messages_folder, get_file_name())
+        file_path = os.path.join(messages_folder, get_file_name() + ".csv")
         if not os.path.exists(file_path):
-            messages = extract_community_channels(account, community, start_timestamp, end_timestamp)
+            messages = extract_community_channels(account, community, latest_dates)
             if len(messages) > 0:
-                messages.to_pickle(file_path)
+                save_file(file_path, messages)
                 account.logger.info(f"Created {file_path}")
 
-def store(folder: str, config: dict):
+def store(folder: str, config: dict, logger: Logger):
     """
     Upload Status App `download` file to Postgres.
     NOTE: The Postgres schema must already exist
@@ -170,22 +223,41 @@ def store(folder: str, config: dict):
     table_schema = config["postgres"]["schema"]
 
     upload: dict[str, list] = {}
-    completed = []
-    for file_path in path.rglob("*.pkl"):
 
-        table_name = table_name_mapping.get(file_path.parent.name)
+    file_path = os.path.join(os.path.dirname(__file__), config["files"]["current_state"])
+    latest_dates: dict[str, pd.Timestamp] = pd.read_pickle(file_path) if os.path.exists(file_path) else {}
+
+    completed = []
+
+    files = list(path.rglob("*.pkl")) + list(path.rglob("*.csv"))
+    logger.info(f"There are {len(files)} file(s) to upload")
+    for file_path in files:
+
+        table_name = table_name_mapping.get(file_path.parent.parent.name)
         if not table_name:
             continue
 
-        data = pd.read_pickle(file_path)
+        file_name = str(file_path.name)
+        data = pd.read_pickle(file_path) if file_name.endswith(".pkl") else pd.read_csv(file_path)
         if isinstance(data, dict):
             data = pd.DataFrame([data])
+
+        for column in data.columns:
+            if "timestamp" not in column:
+                continue
+            data[column] = pd.to_datetime(data[column])
 
         if table_name not in upload:
             upload[table_name] = []
 
+        if "timestamp" in data.columns:
+            latest_dates.update(data.groupby("chat_id")["timestamp"].max().to_dict())
+
         upload[table_name].append(data)
         completed.append(str(file_path))
+
+    save_file(config["files"]["current_state"], latest_dates)
+    logger.info(f"Updated {config['files']['current_state']}")
 
     prefix = "POSTGRES_"
     params = {
@@ -202,22 +274,24 @@ def store(folder: str, config: dict):
         json_columns = [
             column
             for column in df.columns
-            if isinstance(df[column].dropna().reset_index(drop=True).iloc[0], (dict, list))
+            if len(df[column].dropna()) > 0 and isinstance(df[column].dropna().reset_index(drop=True).iloc[0], (dict, list))
         ]
         connector.insert(df, table_name, table_schema, json_columns)
+        logger.info(f"Uploaded {len(df)} record(s) to {table_schema}.{table_name}")
 
     for file_path in completed:
         os.remove(file_path)
-
+        logger.info(f"Deleted {file_path}")
 
 if __name__ == "__main__":
     folder = os.path.dirname(__file__)
     config = load_config(os.path.join(folder, "config.yaml"))
     upload_folder = os.path.join(os.path.dirname(__file__), "uploads")
     logger = Logger()
+    account = create_bot(config)
 
     while True:
-        download(upload_folder, config)
-        store(upload_folder, config)
+        download(account, upload_folder, config)
+        store(upload_folder, config, logger)
         logger.info(f"Sleeping for {config['sleep']} minute(s)")
-        time.sleep(config["sleep"])
+        time.sleep(config["sleep"] * 60)
