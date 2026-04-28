@@ -57,6 +57,16 @@ class Postgres:
                 for json_column in json_columns
             }
 
+        # Add new columns as they come
+        existing_columns = self.get_columns(schema, table_name)
+
+        if existing_columns:
+            for column in data.columns:
+                if column in existing_columns:
+                    continue
+                #  NOTE: New values will have to be transformed
+                self.execute(f"ALTER TABLE {schema}.{table_name} ADD COLUMN {column} TEXT")
+
         data.to_sql(**params)
 
     def execute(self, query: str):
@@ -68,6 +78,29 @@ class Postgres:
         """
         self.__execute(query)
         self.__conn.commit()
+
+    def to_pandas(self, query: str, batch_size: int = 50_000, uppercase: bool = True) -> pd.DataFrame:
+        """
+        Create a DataFrame from the given query
+
+        Parameters:
+            - `query` - the PostgreSQL query
+            - `batch_size` - how many rows will be fetched at once
+            - `uppercase` - if `True` then the columns will be uppercase. If `False` the columns will be lowercase
+        Output:
+            - DataFrame for the executed query
+        """
+        self.__execute(query)
+        columns = [column.name.upper() if uppercase else column.name.lower() for column in self.__cursor.description]
+        chunks = []
+
+        while True:
+            rows = self.__cursor.fetchmany(batch_size)
+            if not rows:
+                break
+            chunks.append(pd.DataFrame(rows, columns=columns))
+
+        return pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame(columns=columns)
 
     def close(self):
         self.__cursor.close()
@@ -93,3 +126,24 @@ class Postgres:
 
         if failed:
             self.__cursor.execute(query)
+
+
+    def get_columns(self, schema: str, table_name: str) -> list[str]:
+        """
+        Get the column names in the correct order for the given table.
+
+        Parameters:
+            - `table_name` - the name of the table
+            - `schema` - the name of the schema
+
+        Output:
+            - the table's columns in the correct order
+        """
+        query = f"""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = '{table_name}'
+        AND table_schema = '{schema}'
+        ORDER BY ordinal_position ASC
+        """
+        return self.to_pandas(query)["COLUMN_NAME"].to_list()

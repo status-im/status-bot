@@ -134,13 +134,15 @@ def save_file(file_path: str, data: Any):
     with open(file_path, "wb") as f:
         pickle.dump(data, f)
 
-def download(folder: str, config: dict):
+def create_bot(config: dict) -> Account:
     """
-    Download Status App messages / info from communities and store them in pickle files.
+    Initialized a logged in bot account that will monitor the communities.
 
     Parameters:
-        - `folder` - the folder where the files will be created. Sub folders are automatically created
         - `config` - the `load_config` configuration
+
+    Output:
+        - Logged in Bot account
     """
     account = Account(**config.get("bot_params", {}))
     available_accounts = [acc["display_name"] for acc in account.available_accounts]
@@ -156,6 +158,16 @@ def download(folder: str, config: dict):
 
     account.login(**params)
     account.logger.info(f"Account Information:\nCompressed Key: {account.info['compressed_key']}\nPublic Key: {account.info['public_key']}\nURL: {account.info['url']}")
+    return account
+
+def download(account: Account, folder: str, config: dict):
+    """
+    Download Status App messages / info from communities and store them in pickle files.
+
+    Parameters:
+        - `folder` - the folder where the files will be created. Sub folders are automatically created
+        - `config` - the `load_config` configuration
+    """
     file_path = os.path.join(os.path.dirname(__file__), config["files"]["current_state"])
     latest_dates: dict[str, pd.Timestamp] = pd.read_pickle(file_path) if os.path.exists(file_path) else {}
 
@@ -197,7 +209,7 @@ def download(folder: str, config: dict):
                 save_file(file_path, messages)
                 account.logger.info(f"Created {file_path}")
 
-def store(folder: str, config: dict):
+def store(folder: str, config: dict, logger: Logger):
     """
     Upload Status App `download` file to Postgres.
     NOTE: The Postgres schema must already exist
@@ -211,10 +223,14 @@ def store(folder: str, config: dict):
     table_schema = config["postgres"]["schema"]
 
     upload: dict[str, list] = {}
-    latest_dates: dict[str, pd.Timestamp] = {}
+
+    file_path = os.path.join(os.path.dirname(__file__), config["files"]["current_state"])
+    latest_dates: dict[str, pd.Timestamp] = pd.read_pickle(file_path) if os.path.exists(file_path) else {}
+
     completed = []
 
     files = list(path.rglob("*.pkl")) + list(path.rglob("*.csv"))
+    logger.info(f"There are {len(files)} file(s) to upload")
     for file_path in files:
 
         table_name = table_name_mapping.get(file_path.parent.parent.name)
@@ -240,8 +256,8 @@ def store(folder: str, config: dict):
         upload[table_name].append(data)
         completed.append(str(file_path))
 
-    if latest_dates:
-        save_file(config["files"]["current_state"], latest_dates)
+    save_file(config["files"]["current_state"], latest_dates)
+    logger.info(f"Updated {config['files']['current_state']}")
 
     prefix = "POSTGRES_"
     params = {
@@ -258,22 +274,24 @@ def store(folder: str, config: dict):
         json_columns = [
             column
             for column in df.columns
-            if isinstance(df[column].dropna().reset_index(drop=True).iloc[0], (dict, list))
+            if len(df[column].dropna()) > 0 and isinstance(df[column].dropna().reset_index(drop=True).iloc[0], (dict, list))
         ]
         connector.insert(df, table_name, table_schema, json_columns)
+        logger.info(f"Uploaded {len(df)} record(s) to {table_schema}.{table_name}")
 
     for file_path in completed:
         os.remove(file_path)
-
+        logger.info(f"Deleted {file_path}")
 
 if __name__ == "__main__":
     folder = os.path.dirname(__file__)
     config = load_config(os.path.join(folder, "config.yaml"))
     upload_folder = os.path.join(os.path.dirname(__file__), "uploads")
     logger = Logger()
+    account = create_bot(config)
 
     while True:
-        download(upload_folder, config)
-        store(upload_folder, config)
+        download(account, upload_folder, config)
+        store(upload_folder, config, logger)
         logger.info(f"Sleeping for {config['sleep']} minute(s)")
-        time.sleep(config["sleep"])
+        time.sleep(config["sleep"] * 60)
