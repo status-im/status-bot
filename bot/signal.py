@@ -95,7 +95,7 @@ class Signal:
 
     def __listen_message(self, ws: websocket.WebSocketApp, signal: str):
         """
-
+        Listen continuously for Status Backend signals
         """
         signal: dict = json.loads(signal)
         if signal["type"] != self.__signal_type:
