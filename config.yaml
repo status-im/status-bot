@@ -3,7 +3,6 @@ postgres:
     tables:
         messages: "raw_messages"
         community: "raw_community_info"
-        members: "raw_community_activity"
 # Value must be in MINUTES
 sleep: 10
 files:

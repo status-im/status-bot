@@ -43,37 +43,6 @@ def load_config(file_path: str) -> dict:
 
     return config
 
-def extract_community_members(account: Account, community_id: str) -> pd.DataFrame:
-    """
-    Extract the community members. Uses manual RPC call function.
-
-    Parameters:
-        - `account` - logged in Status Bot account
-        - `community_id` - community ID as it is in `account.communities`
-
-    Output:
-        - DataFrame with all of the members
-    """
-    data = account.call_rpc("messaging", "communities")
-    for result in data["result"]:
-        if result["id"] != community_id:
-            continue
-
-        extract_timestamp = datetime.datetime.now()
-
-        members = pd.DataFrame([
-            {
-                "community_id": community_id,
-                "member_id": member_id,
-                "last_checked": datetime.datetime.fromtimestamp(info["last_update_clock"]) if "last_update_clock" in info else None,
-                "extract_timestamp": extract_timestamp
-            }
-            for member_id, info in result["members"].items()
-        ])
-        return members
-
-    return pd.DataFrame()
-
 def extract_community_channels(account: Account, community: dict, latest_dates: dict[str, pd.Timestamp]) -> pd.DataFrame:
     """
     Extract the community channel messages.
@@ -184,23 +153,14 @@ def download(account: Account, folder: str, config: dict):
         community_folder_name = community["name"].replace(" ", "-")
         messages_folder = os.path.join(folder, "messages", community_folder_name)
         community_info_folder = os.path.join(folder, "community", community_folder_name)
-        members_info_folder = os.path.join(folder, "members", community_folder_name)
 
         account.logger.info(f"Extracting data for {community['name']}")
         community["extracted_timestamp"] = datetime.datetime.now()
 
         file_path = os.path.join(community_info_folder, get_file_name() + ".pkl")
-
         if not os.path.exists(file_path):
             save_file(file_path, community)
             account.logger.info(f"Created {file_path}")
-
-        file_path = os.path.join(members_info_folder, get_file_name() + ".csv")
-        if not os.path.exists(file_path):
-            members = extract_community_members(account, community["id"])
-            if len(members) > 0:
-                save_file(file_path, members)
-                account.logger.info(f"Created {file_path}")
 
         file_path = os.path.join(messages_folder, get_file_name() + ".csv")
         if not os.path.exists(file_path):
