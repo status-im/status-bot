@@ -1,5 +1,5 @@
 from typing import Optional, Union, Generator, Any
-import requests, datetime, re, logging, os
+import requests, datetime, re, logging, os, json, ast
 import pandas as pd
 from .signal import Signal
 from .logger import Logger
@@ -565,6 +565,8 @@ class Account:
                     self.__camel_to_snake(key): value if key not in timestamp_keys else datetime.datetime.fromtimestamp(value / self.__timestamp_divisor)
                     for key, value in message.items()
                 }
+                if isinstance(point.get("bridge_message"), str):
+                    point["bridge_message"] = json.loads(json.dumps(ast.literal_eval(point["bridge_message"])))
 
                 if start_timestamp and point["timestamp"] < start_timestamp:
                     finished = True
