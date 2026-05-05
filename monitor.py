@@ -113,7 +113,8 @@ def create_bot(config: dict) -> Account:
     Output:
         - Logged in Bot account
     """
-    account = Account(**config.get("bot_params", {}))
+    params = config.get("bot", {}).get("params", {})
+    account = Account(**params)
     available_accounts = [acc["display_name"] for acc in account.available_accounts]
 
     prefix = "STATUS_"
@@ -126,6 +127,9 @@ def create_bot(config: dict) -> Account:
         params.pop("mnemonic")
 
     account.login(**params)
+    if account.info["compressed_key"] != config["bot"]["compressed_key"]:
+        raise Exception("Target compressed key and logged in compressed key are different")
+
     account.logger.info(f"Account Information:\nCompressed Key: {account.info['compressed_key']}\nPublic Key: {account.info['public_key']}\nURL: {account.info['url']}")
     return account
 

@@ -8,10 +8,14 @@ sleep: 10
 files:
     # Get the latest community chat dates for next run
     current_state: "dates.pkl"
-# Parameters based on Account class
-bot_params:
-    # localhost - to run code locally with Status Backend Dockerfile
-    # status-backend - to run code with docker-compose.yaml
-    domain: "status-backend"
-    port: 8080
-    is_secure: false
+
+bot:
+    compressed_key: "zQ3shNv1tnajHo5FvCvP662cWcbBfS5ZejB4TWaH9iAuFCZZe"
+    # Parameters based on Account class
+    params:
+        # localhost - to run code locally with Status Backend Dockerfile
+        # status-backend - to run code with docker-compose.yaml
+        # domain: "status-backend"
+        domain: "status-backend"
+        port: 8080
+        is_secure: false
