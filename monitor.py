@@ -3,9 +3,22 @@ import pandas as pd
 from typing import Any
 from pathlib import Path
 from dotenv import load_dotenv
+from hashlib import sha256
 # Manual file imports
 from bot import Account, Logger
 from postgres import Postgres
+
+def to_sha256_hash(value: str) -> str:
+    """
+    Hash personal information before it is put in the database.
+
+    Parameters:
+        - `value` - personal information
+
+    Output:
+        - sha256 hashed value
+    """
+    return sha256(value.encode()).hexdigest()
 
 def to_midnight(timestamp: datetime.datetime) -> datetime.datetime:
     """
@@ -56,6 +69,22 @@ def extract_community_channels(account: Account, community: dict, latest_dates: 
     Output:
         - DataFrame with all of the community messages for the given start and end timestamps
     """
+    # Column name -> True if data should be hashed
+    bridge_key = "bridge_message"
+    columns = {
+        "id": True,
+        "whisper_timestamp": False,
+        "from": True,
+        "seen": False,
+        "chat_id": False,
+        "community_id": False,
+        "local_chat_id": False,
+        "response_to": True,
+        "timestamp": False,
+        "deleted": False,
+        "extracted_timestamp": False,
+    }
+
     final = []
     for channel in community["channels"]:
 
@@ -82,7 +111,27 @@ def extract_community_channels(account: Account, community: dict, latest_dates: 
         )
         final.append(messages)
 
-    return pd.concat(final, ignore_index=True) if final else pd.DataFrame()
+    extracted_data = pd.concat(final, ignore_index=True) if final else pd.DataFrame()
+    if len(extracted_data) == 0:
+        return extracted_data
+
+    existing_columns = extracted_data.columns.to_list()
+    for column, should_hash in columns.items():
+        if column not in existing_columns:
+            loc = len(extracted_data.columns.to_list())
+            extracted_data.insert(loc, column, None)
+            continue
+
+        if should_hash:
+            extracted_data[column] = extracted_data[column].astype(str).apply(to_sha256_hash)
+
+    if bridge_key in extracted_data.columns:
+        extracted_data["source"] = extracted_data[bridge_key].apply(lambda value: value["bridgeName"] if not pd.isna(value) else "status")
+
+    extracted_data = extracted_data[list(columns.keys()) + ["source"]]
+    account.logger.info(f"Sensitive data has been hashed")
+
+    return extracted_data
 
 def save_file(file_path: str, data: Any):
     """
