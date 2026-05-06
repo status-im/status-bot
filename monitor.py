@@ -78,7 +78,7 @@ def extract_community_channels(account: Account, community: dict, latest_dates: 
         "seen": False,
         "chat_id": False,
         "community_id": False,
-        "local_chat_id": False,
+        "message_type": False,
         "response_to": True,
         "timestamp": False,
         "deleted": False,
@@ -127,8 +127,13 @@ def extract_community_channels(account: Account, community: dict, latest_dates: 
 
     if bridge_key in extracted_data.columns:
         extracted_data["source"] = extracted_data[bridge_key].apply(lambda value: value["bridgeName"] if not pd.isna(value) else "status")
+    else:
+        extracted_data["source"] = "status"
 
-    extracted_data = extracted_data[list(columns.keys()) + ["source"]]
+    extracted_data = extracted_data[list(columns.keys()) + ["source"]].assign(
+        deleted = extracted_data["deleted"].fillna(False),
+        seen = extracted_data["seen"].fillna(False)
+    )
     account.logger.info(f"Sensitive data has been hashed")
 
     return extracted_data
@@ -283,7 +288,7 @@ def store(folder: str, config: dict, logger: Logger):
         if len(data) == 0:
             continue
 
-        df = pd.concat(data, ignore_index=True)
+        df = pd.concat(data, ignore_index=True).assign(batch_timestamp = datetime.datetime.now())
         json_columns = [
             column
             for column in df.columns

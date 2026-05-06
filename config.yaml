@@ -10,6 +10,8 @@ files:
     current_state: "dates.pkl"
 
 bot:
+    # Public information for the bot
+    public_key: "0x041658626a9e1303b631f6d0fb1e047211d5603b977454f7d5d29fe583c3d6c1bd3d8e395d67f6c44b5bc659aae912040e9dd8164b5107368a29029cb53389d8b0"
     compressed_key: "zQ3shNv1tnajHo5FvCvP662cWcbBfS5ZejB4TWaH9iAuFCZZe"
     # Parameters based on Account class
     params:
