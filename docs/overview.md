@@ -1,64 +1,54 @@
-# Status Python SDK
+# Status Bot
 
-![Status Python SDK header image](./images/overview-header.png)
+The Status Bot is a Python tool communicating with the Status-backend to automate some actions.
 
-The initial Python Status Backend was built with testing in mind, instead of easy developer access. The objective of this repository is to make a SDK that is:
-
-- **light** - as less external packages when it comes to working with Status App
-- **fast** - quick to get started with Status Python
-- **documented** - clear explanations of what was done and **why it was done in a specific way**.
-
-Currently this repository is not on [PyPi](https://pypi.org/) but will be added when core functionality has been devleoped and tested.
-
-## How it works
+## Architecture
 
 ```mermaid
 graph TB
-   subgraph backend[status-im/status-go]
-       subgraph Endpoints[Network: status-bridge]
-           RPC[RPC]
-           HTTP[REST]
-           SOCKET[Web Socket]
-       end
-       Vol[(Backup)]
-   end
 
-
-   subgraph bot[Python SDK]
-        REQUIREMENTS[requirements.txt]
-        SDK[class Account]
-        SIGNAL[class Signal]
-    end
-
-    subgraph external[External Services]
+   BACKEND[Status Backend]
+   BOT[Status Bot]
+   DB[Database]
+   subgraph external[External Services]
         COINGECKO[CoinGecko]
-        EVM
+        INFURA[Infura]
     end
 
-   SDK --> SIGNAL
-   SDK --> |Port 8080| RPC
-   SDK --> |Port 8080| HTTP
-   SIGNAL --> |Port 8080| SOCKET
-   SDK --> Vol
-   RPC --> |coingecko_api_key| COINGECKO
-   RPC --> |infura_token| EVM
+   BOT --> BACKEND
+   BACKEND --> |coingecko_api_key| COINGECKO
+   BACKEND --> |infura_token| INFURA
+   BOT --> DB
 ```
 
-## Setup
+The Status Bot use [status-python-sdk](https://github.com/status-im/status-python-sdk) for the interraction with Status Backend.
 
-To access Python funcitonality you will have to set up [Status Backend](https://github.com/status-im/status-go/). Easiest and fastest way to get it running would be with [Docker](https://www.docker.com/products/docker-desktop/).
+The Status-Backend use external services:
+* CoinGecko - Optional to get token price
+* EVM access - (Infura for example) required to interract with Token Gated community.
 
-```mermaid
-sequenceDiagram
-    actor User
-    participant Docker
-    participant Python@{"alias": "status-im/status-bot"}
-    participant Github@{"alias": "status-im/status-go" }
-    
-    User ->> Docker: docker-compose up
-    Docker ->> Github: Fetch Image
-    Docker ->> Docker: Build
-    User ->> Docker: Run container
-    User ->> Python: initialize module
-    Note over User,Python: from bot import Account<br>account = Account()
+## Account Setup
+
+The Bot require a Status Account to work.
+
+### Intializing new account
+
+The account can be initialized at startup with the following configuration:
+
+```yaml
+bot:
+  init_account: true
+  display_name: 'status-bot'
+  password: 'ChangeMeIfYouCare'
+  mnemonic_phrase: 'twelve characters list ...'
+  compressed_key: 'compressed-key'
 ```
+
+### Importing Status Account
+
+The account can also be imported from the Status Application.
+It first need to export a backup, then import it in the docker container under `/backups`.
+
+> Note: the account backup need to also be imported in Status Backend
+
+The full configuration explaination can be found at [./deployment/configuration.md]

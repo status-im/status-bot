@@ -1,17 +1,19 @@
 ---
 services:
     backend:
-        image: harbor.status.im/bi/status-backend:dev
-        # build:
-        #     context: https://github.com/status-im/status-go.git#develop
-        # platform: linux/amd64
+        build:
+            context: https://github.com/status-im/status-go.git#${STATUS_GO_REF:-develop}
         container_name: status-backend
         ports:
             - 8080:8080
+            - 9002:9000
             - 8545:8545
             - 30303:30303
         entrypoint: 'status-backend'
         command: '-address 0.0.0.0:8080'
+        environment:
+            STATUS_GO_MEDIA_SERVER_PORT: "9000"
+            STATUS_GO_MEDIA_SERVER_HOST: "0.0.0.0"
         volumes:
             - ./backups:/root/.config/Status/backups
             - ./assets:/assets:ro
@@ -24,22 +26,28 @@ services:
         build:
             context: .
             dockerfile: Dockerfile
-        container_name: status-monitor
+        container_name: status-bot
         depends_on:
             - backend
             - database
         volumes:
             - ./backups:/backups
+            - ./config.yaml:/app/config.yaml
         env_file:
             - .env
+        ports:
+            - 8081:8081
+            - 8000:8000
         networks:
             - status-bridge
 
     database:
         image: postgres:15
         container_name: database
-        env_file:
-            - .env
+        environment:
+            POSTGRES_DB: 'status-bot'
+            POSTGRES_USER: 'status'
+            POSTGRES_PASSWORD: 'ChangeMeIfYouCare'
         ports:
             - 5432:5432
         volumes:

@@ -1,13 +1,14 @@
-FROM python:3.12-slim
-
+# Stage 1: Build
+FROM python:3.12-slim AS builder
 WORKDIR /app
-COPY requirements.txt .
-COPY bot/requirements.txt bot/requirements.txt
 
-RUN pip install --no-cache-dir -r requirements.txt \
-    && if [ -f bot/requirements.txt ]; then pip install --no-cache-dir -r bot/requirements.txt; fi
+# Copy dependency metadata first (better cache invalidation)
+COPY pyproject.toml ./
 
-COPY . .
+# Install package and dependencies
+RUN pip install --no-cache-dir -e .
 
-ENTRYPOINT ["python", "monitor.py"]
-CMD []
+# Copy source code
+COPY . ./
+
+CMD ["python", "main.py"]

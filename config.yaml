@@ -1,23 +1,48 @@
-postgres:
-    schema: "status_app_monitoring"
-    tables:
-        messages: "raw_messages"
-        community: "raw_community_info"
-# Value must be in MINUTES
-sleep: 10
+database:
+  type: postgres
+  host: "database"
+  port: 5432
+  schema: "status_app_monitoring"
+  name: "status-bot"
+  tables:
+    messages: "raw_messages"
+    community: "raw_community_info"
+
+ logging:
+   format: human
+   level: info
+   uvicorn_access: false
+
 files:
-    # Get the latest community chat dates for next run
-    current_state: "dates.pkl"
+  # Get the latest community chat dates for next run
+  current_state: "dates.pkl"
 
 bot:
-    # Public information for the bot
-    public_key: "0x041658626a9e1303b631f6d0fb1e047211d5603b977454f7d5d29fe583c3d6c1bd3d8e395d67f6c44b5bc659aae912040e9dd8164b5107368a29029cb53389d8b0"
-    compressed_key: "zQ3shNv1tnajHo5FvCvP662cWcbBfS5ZejB4TWaH9iAuFCZZe"
-    # Parameters based on Account class
-    params:
-        # localhost - to run code locally with Status Backend Dockerfile
-        # status-backend - to run code with docker-compose.yaml
-        # domain: "status-backend"
-        domain: "status-backend"
-        port: 8080
-        is_secure: false
+  init_account: true
+  name: 'status-bot'
+  public_key: "0xExample"
+  bot_hash_pepper: '' #Use a large random value
+
+backend:
+  domain: "status-backend"
+  backend_port: 8080
+  is_secure: false
+
+api:
+  enable: true
+  host: "0.0.0.0"
+  port: 8081
+  # api_key: "your-secret-key"
+
+modules:
+  directories: []
+  enabled: ["messaging", "receiver"]
+  settings:
+    receiver:
+      messages_table: "received_messages"
+      chats_table: "received_chats"
+
+metrics:
+  enabled: true
+  host: "0.0.0.0"
+  port: 8000

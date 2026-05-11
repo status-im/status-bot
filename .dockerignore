@@ -12,3 +12,7 @@ bot/docs
 
 config.yaml
 .env
+
+accounts/
+backups/
+data-dir/
