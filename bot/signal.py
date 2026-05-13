@@ -120,12 +120,13 @@ class Signal:
         if self.__thread.is_alive():
             self.__thread.join(1)
 
-    def listen(self, signal_type: str):
+    def listen(self, signal_type: str, stop_event: Optional[threading.Event] = None):
         """
         Listen for a specific Signal forever
 
         Parameters:
             - `signal_type` - the "type" as it is in Status Backend
+            - `stop_event` - optional threading.Event for graceful shutdown
         """
         self.__signal_type = signal_type
         ws = websocket.WebSocketApp(
@@ -139,7 +140,11 @@ class Signal:
         self.__thread.start()
         while True:
             try:
-                data = self.__queue.get()
+                data = self.__queue.get(timeout=1)
+            except queue.Empty:
+                if stop_event and stop_event.is_set():
+                    break
+                continue
             except KeyboardInterrupt:
                 break
             if self.__error_message:

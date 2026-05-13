@@ -21,3 +21,14 @@ bot:
         domain: "status-backend"
         port: 8080
         is_secure: false
+
+modules:
+    directories:
+        - ./modules
+    enabled: []
+    settings: {}
+
+prometheus:
+    enabled: false
+    host: "0.0.0.0"
+    port: 8000

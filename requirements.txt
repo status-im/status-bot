@@ -3,3 +3,4 @@ pyyaml
 python-dotenv
 psycopg2-binary
 sqlalchemy
+prometheus-client
