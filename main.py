@@ -1,3 +1,4 @@
+from logging import log
 import os
 import sys
 import signal
@@ -43,6 +44,7 @@ def create_bot(config: dict) -> Account:
         params.pop("mnemonic")
 
     account.login(**params)
+    account.logger.info(f"Account Info {account.info}")
     if account.info["compressed_key"] != config["bot"]["compressed_key"]:
         raise Exception("Target compressed key and logged in compressed key are different")
 
@@ -108,6 +110,7 @@ def main():
     logger = Logger()
 
     try:
+        logger.info("Loading the configuration")
         config = load_config(config_path)
     except Exception as e:
         logger.error(f"Failed to load config: {e}")

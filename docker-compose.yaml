@@ -24,14 +24,17 @@ services:
         build:
             context: .
             dockerfile: Dockerfile
-        container_name: status-monitor
+        container_name: status-bot
         depends_on:
             - backend
             - database
         volumes:
             - ./backups:/backups
+            - ./config.yaml:/app/config.yaml
         env_file:
             - .env
+        ports:
+            - 8000:8000
         networks:
             - status-bridge
 
