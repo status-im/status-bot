@@ -1,60 +1,78 @@
-import os
-
-import yaml
-from dotenv import load_dotenv
-
-from bot import Account
-from postgres import Postgres
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings.sources import YamlConfigSettingsSource
 
 
-def load_config(file_path: str) -> dict:
-    with open(file_path, "r") as f:
-        config: dict = yaml.safe_load(f)
-
-    env_file_path = os.path.join(os.path.dirname(file_path), ".env")
-    load_dotenv(env_file_path)
-
-    config["env_vars"] = {
-        key: value
-        for key, value in os.environ.items()
-        if key.startswith(("POSTGRES_", "STATUS_"))
-    }
-
-    return config
+class BotParams(BaseModel):
+    domain: str = "localhost"
+    port: int = 8080
+    is_secure: bool = False
 
 
-def create_bot(config: dict, project_root: str) -> Account:
-    params = config.get("bot", {}).get("params", {})
-    account = Account(**params)
-    available_accounts = [acc["display_name"] for acc in account.available_accounts]
+class BotConfig(BaseModel):
+    display_name: str = ""
+    public_key: str = ""
+    password: str = ""
+    mnemonic_phrase: str = ""
+    init_account: bool = False
+    compressed_key: str = ""
+    infura_token: str = ""
+    coingecko_api_key: str = ""
+    params: BotParams = BotParams()
 
-    prefix = "STATUS_"
-    params = {
-        key.replace(prefix, "").lower(): value
-        for key, value in config["env_vars"].items()
-        if key.startswith(prefix)
-    }
-    if params["display_name"] in available_accounts:
-        params.pop("mnemonic")
 
-    account.login(**params)
-    account.logger.info(f"Account Info {account.info}")
-    if account.info["compressed_key"] != config["bot"]["compressed_key"]:
-        raise Exception("Target compressed key and logged in compressed key are different")
+class PostgresConfig(BaseModel):
+    host: str = "database"
+    port: int = 5432
+    user: str = ""
+    password: str = ""
+    name: str = ""
+    schema: str = "public"
+    tables: dict = {}
 
-    account.profile_picture = os.path.join(project_root, "assets", "profile.jpg")
-    account.logger.info(
-        f"Account Information:\nCompressed Key: {account.info['compressed_key']}\n"
-        f"Public Key: {account.info['public_key']}\nURL: {account.info['url']}"
+
+class PrometheusConfig(BaseModel):
+    enabled: bool = False
+    host: str = "0.0.0.0"
+    port: int = 8000
+
+
+class FilesConfig(BaseModel):
+    current_state: str = "dates.pkl"
+
+
+class ModulesConfig(BaseModel):
+    directories: list[str] = ["./modules"]
+    enabled: list[str] = []
+    settings: dict = {}
+
+
+class Config(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_nested_delimiter="_",
+        extra="ignore",
     )
-    return account
 
+    sleep: int = 10
+    files: FilesConfig = FilesConfig()
+    bot: BotConfig = BotConfig()
+    modules: ModulesConfig = ModulesConfig()
+    prometheus: PrometheusConfig = PrometheusConfig()
+    postgres: PostgresConfig = PostgresConfig()
 
-def init_postgres(config: dict) -> Postgres:
-    prefix = "POSTGRES_"
-    params = {
-        key.replace(prefix, "").lower(): value
-        for key, value in config["env_vars"].items()
-        if key.startswith(prefix)
-    }
-    return Postgres(**params)
+    _yaml_file = "./config.yaml"
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        return (
+            YamlConfigSettingsSource(settings_cls, yaml_file=cls._yaml_file),
+            env_settings,
+            dotenv_settings,
+        )

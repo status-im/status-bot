@@ -6,12 +6,13 @@ from typing import Optional, Type
 from pathlib import Path
 
 from .base import BaseModule, ModuleConfig, ModuleContext, ModuleType
+from bot.config import ModulesConfig
 
 
 class ModuleManager:
 
-    def __init__(self, config: dict, account, db, logger: logging.Logger):
-        self._config = config
+    def __init__(self, modules_config: ModulesConfig, account, db, logger: logging.Logger):
+        self._modules_config = modules_config
         self._account = account
         self._db = db
         self._logger = logger
@@ -29,10 +30,7 @@ class ModuleManager:
         return list(self._modules.keys())
 
     def discover_modules(self) -> None:
-        modules_config = self._config.get("modules", {})
-        directories = modules_config.get("directories", ["modules"])
-
-        for directory in directories:
+        for directory in self._modules_config.directories:
             self._discover_from_directory(directory)
 
         self._logger.info(
@@ -74,9 +72,8 @@ class ModuleManager:
                 self._logger.debug(f"Found module class: {module_name}.{attr_name}")
 
     def load_modules(self) -> None:
-        modules_config = self._config.get("modules", {})
-        enabled = set(modules_config.get("enabled", []))
-        settings = modules_config.get("settings", {})
+        enabled = set(self._modules_config.enabled)
+        settings = self._modules_config.settings
 
         if not enabled:
             self._logger.info("No modules enabled in config")

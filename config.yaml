@@ -1,34 +1,39 @@
 postgres:
-    schema: "status_app_monitoring"
-    tables:
-        messages: "raw_messages"
-        community: "raw_community_info"
+  host: "database"
+  port: 5432
+  schema: "status_app_monitoring"
+  name: "status-bot"
+  tables:
+    messages: "raw_messages"
+    community: "raw_community_info"
 # Value must be in MINUTES
 sleep: 10
 files:
-    # Get the latest community chat dates for next run
-    current_state: "dates.pkl"
+  # Get the latest community chat dates for next run
+  current_state: "dates.pkl"
 
 bot:
-    # Public information for the bot
-    public_key: "0x04e06d0fea33b0df9d6617353ee8e78ca766a366b924049444ec163bdbb02939640df273e7ac3578e9810519f65cbb9594be1a7e43d89373807a7268fb1d90daa2" #"0x041658626a9e1303b631f6d0fb1e047211d5603b977454f7d5d29fe583c3d6c1bd3d8e395d67f6c44b5bc659aae912040e9dd8164b5107368a29029cb53389d8b0"
-    compressed_key: "zQ3shcWrY3jZSRUKX33uwXxvGJciKSLphUdVMttC5xiir6Qks"
-    # Parameters based on Account class
-    params:
-        # localhost - to run code locally with Status Backend Dockerfile
-        # status-backend - to run code with docker-compose.yaml
-        # domain: "status-backend"
-        domain: "status-backend"
-        port: 8080
-        is_secure: false
+  display_name: 'e-raccoon'
+  public_key: "0xExample"
+  compressed_key: "example-compressed-key"
+  password: 'ChangeMe'
+  mnemonic_phrase: 'some random word ...'
+  init_account: true
+  infura_token: ""
+  coingecko_api_key: ""
+  # Parameters based on Account class
+  params:
+    domain: "status-backend"
+    port: 8080
+    is_secure: false
 
 modules:
-    directories:
-        - ./modules
-    enabled: []
-    settings: {}
+  directories:
+    - ./modules
+  enabled: []
+  settings: {}
 
 prometheus:
-    enabled: true
-    host: "0.0.0.0"
-    port: 8000
+  enabled: true
+  host: "0.0.0.0"
+  port: 8000

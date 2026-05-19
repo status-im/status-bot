@@ -990,8 +990,8 @@ class Account:
                 self.__signal.get("messages.new")
                 self.logger.info(f"Successfully loaded file!")
                 break
-
-            self.logger.warning(error)
+            else:
+                self.logger.warning(f"Error while loading the backup: {error}")
 
     def __call_rpc(self, prefix: str, method_name: str, params: Optional[Union[list, dict]] = None) -> dict:
         """

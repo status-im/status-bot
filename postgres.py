@@ -11,20 +11,20 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 class Postgres:
 
-    def __init__(self, username: str, password: str, port: Union[int, str], database: str, host: str):
+    def __init__(self, user: str, password: str, port: Union[int, str], database: str, host: str):
 
         if isinstance(port, str):
             port = int(port)
 
         self.__params = {
             "host": host,
-            "user": username,
+            "user": user,
             "password": password,
             "port": port,
             "database": database
         }
 
-        self.__url = f"postgresql://{username}:{password}@{host}:{port}/{database}"
+        self.__url = f"postgresql://{user}:{password}@{host}:{port}/{database}"
         self.__conn: psycopg2.extensions.connection = psycopg2.connect(**self.__params)
         self.__cursor: psycopg2.extensions.cursor = self.__conn.cursor()
 

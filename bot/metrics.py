@@ -1,11 +1,11 @@
 import logging
 
+from bot.config import PrometheusConfig
 from bot.modules.manager import ModuleManager
 
 
-def start_prometheus(config: dict, manager: ModuleManager, logger: logging.Logger):
-    prom_config = config.get("prometheus", {})
-    if not prom_config.get("enabled", False):
+def start_prometheus(prometheus_config: PrometheusConfig, manager: ModuleManager, logger: logging.Logger):
+    if not prometheus_config.enabled:
         logger.info("Prometheus metrics disabled")
         return
 
@@ -30,8 +30,8 @@ def start_prometheus(config: dict, manager: ModuleManager, logger: logging.Logge
         for module_name in manager.module_names:
             module_loaded.labels(module=module_name).set(1)
 
-        host = prom_config.get("host", "0.0.0.0")
-        port = prom_config.get("port", 8000)
+        host = prometheus_config.host
+        port = prometheus_config.port
         start_http_server(port, host)
         logger.info(f"Prometheus metrics server started on {host}:{port}")
     except ImportError:
