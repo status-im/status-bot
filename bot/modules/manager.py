@@ -11,7 +11,7 @@ from bot.config import ModulesConfig
 
 class ModuleManager:
 
-    def __init__(self, modules_config: ModulesConfig, account, db, logger: logging.Logger):
+    def __init__(self, modules_config: ModulesConfig, account, db, logger: logging.Logger, shared_state: dict = None):
         self._modules_config = modules_config
         self._account = account
         self._db = db
@@ -20,6 +20,7 @@ class ModuleManager:
         self._module_classes: dict[str, Type[BaseModule]] = {}
         self._threads: dict[str, threading.Thread] = {}
         self._stop_event = threading.Event()
+        self._shared_state = shared_state or {}
 
     @property
     def modules(self) -> dict[str, BaseModule]:
@@ -52,9 +53,16 @@ class ModuleManager:
     def _load_module_from_file(self, file_path: Path) -> None:
         module_name = file_path.stem
 
-        spec = importlib.util.spec_from_file_location(
-            f"modules.{module_name}", file_path
-        )
+        if module_name in ("base", "manager", "utils"):
+            return
+
+        bot_modules_dir = Path(__file__).parent.resolve()
+        if file_path.parent.resolve() == bot_modules_dir:
+            pkg_name = f"bot.modules.{module_name}"
+        else:
+            pkg_name = f"modules.{module_name}"
+
+        spec = importlib.util.spec_from_file_location(pkg_name, file_path)
         if spec is None or spec.loader is None:
             return
 
@@ -104,6 +112,7 @@ class ModuleManager:
                 config=module_config,
                 logger=self._logger,
                 db=self._db,
+                shared_state=self._shared_state,
                 stop_event=self._stop_event,
             )
 

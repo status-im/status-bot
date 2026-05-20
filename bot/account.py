@@ -157,10 +157,17 @@ class Account:
 
         # Wallet usage
         if infura_token:
+            self.logger.info("Adding Infura token")
             params["infuraToken"] = infura_token
+        else:
+            self.logger.info("No infura token")
 
         if coingecko_api_key:
+            self.logger.info("Adding CoinGechko token")
             params["coingeckoApiKey"] = coingecko_api_key
+        else:
+            self.logger.info("No coingecko token")
+
 
         if infura_token and coingecko_api_key:
             self.__is_wallet_set = True

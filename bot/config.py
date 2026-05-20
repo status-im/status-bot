@@ -42,14 +42,14 @@ class FilesConfig(BaseModel):
 
 
 class ModulesConfig(BaseModel):
-    directories: list[str] = ["./modules"]
+    directories: list[str] = ["./modules", "bot/modules"]
     enabled: list[str] = []
     settings: dict = {}
 
 
 class Config(BaseSettings):
     model_config = SettingsConfigDict(
-        env_nested_delimiter="_",
+        env_nested_delimiter="__",
         extra="ignore",
     )
 

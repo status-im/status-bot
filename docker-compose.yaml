@@ -41,8 +41,10 @@ services:
     database:
         image: postgres:15
         container_name: database
-        env_file:
-            - .env
+        environment:
+            POSTGRES_DB: 'status-bot'
+            POSTGRES_USER: 'status'
+            POSTGRES_PASSWORD: 'ChangeMeIfYouCare'
         ports:
             - 5432:5432
         volumes:

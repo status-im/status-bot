@@ -2,6 +2,8 @@ import logging
 
 from bot.config import PrometheusConfig
 from bot.modules.manager import ModuleManager
+from prometheus_client import start_http_server, Gauge, Counter
+
 
 
 def start_prometheus(prometheus_config: PrometheusConfig, manager: ModuleManager, logger: logging.Logger):
@@ -10,8 +12,6 @@ def start_prometheus(prometheus_config: PrometheusConfig, manager: ModuleManager
         return
 
     try:
-        from prometheus_client import start_http_server, Gauge, Counter
-
         health = Gauge("status_bot_health", "Bot health status")
         version = Gauge("status_bot_version", "Bot version", ["version"])
         module_loaded = Gauge(

@@ -4,6 +4,7 @@ import signal
 import argparse
 
 from bot import Account, Logger
+import bot
 from bot.config import Config
 from bot.metrics import start_prometheus
 from bot.modules.manager import ModuleManager
@@ -19,7 +20,12 @@ def create_bot(config: Config, project_root: str) -> Account:
 
     if display_name in available_accounts:
         account.logger.info(f"Logging in with display name: {display_name}")
-        account.login(display_name=display_name, password=password)
+        account.login(
+            display_name=display_name,
+            password=password,
+            infura_token=config.bot.infura_token,
+            coingecko_api_key=config.bot.coingecko_api_key
+        )
     elif config.bot.init_account:
         mnemonic = config.bot.mnemonic_phrase
         if not mnemonic:
@@ -31,6 +37,8 @@ def create_bot(config: Config, project_root: str) -> Account:
             display_name=display_name,
             password=password,
             mnemonic=mnemonic,
+            infura_token=config.bot.infura_token,
+            coingecko_api_key=config.bot.coingecko_api_key
         )
     else:
         raise ValueError(
@@ -38,20 +46,18 @@ def create_bot(config: Config, project_root: str) -> Account:
             f"Available accounts: {[a['display_name'] for a in available_accounts]}"
         )
 
-    account.logger.info(f"Account Info {account.info}")
-
     if account.info["compressed_key"] != config.bot.compressed_key:
         raise Exception(
-            "Target compressed key and logged in compressed key are different"
+            "Target compressed key and logged in compressed key are different."
         )
 
     profile_path = os.path.join(project_root, "assets", "profile.jpg")
     account.profile_picture = profile_path
     account.logger.info(
-        f"Account Information:\n"
-        f"Compressed Key: {account.info['compressed_key']}\n"
-        f"Public Key: {account.info['public_key']}\n"
-        f"URL: {account.info['url']}"
+        f"Account Information: {account.info['display_name']}\n"
+        f"\tCompressed Key: {account.info['compressed_key']}\n"
+        f"\tPublic Key: {account.info['public_key']}\n"
+        f"\tURL: {account.info['url']}"
     )
     return account
 
@@ -106,7 +112,7 @@ def main():
         config.postgres.password,
         config.postgres.name,
     ])
-    logger.info(f"Postgres configuration {config.postgres}")
+
     if has_postgres:
         try:
             db = init_postgres(config)
@@ -117,7 +123,8 @@ def main():
     else:
         logger.info("No Postgres configuration found, running without database")
 
-    manager = ModuleManager(config.modules, account, db, logger)
+    shared_state = {"config": config, "project_root": project_root}
+    manager = ModuleManager(config.modules, account, db, logger, shared_state=shared_state)
     manager.discover_modules()
     manager.load_modules()
 
