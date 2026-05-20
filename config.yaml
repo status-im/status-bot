@@ -13,24 +13,24 @@ files:
   current_state: "dates.pkl"
 
 bot:
+  init_account: false
   display_name: 'e-raccoon'
   public_key: "0xExample"
   compressed_key: "example-compressed-key"
-  password: 'ChangeMe'
-  mnemonic_phrase: 'some random word ...'
-  init_account: true
-  infura_token: ""
-  coingecko_api_key: ""
-  # Parameters based on Account class
-  params:
-    domain: "status-backend"
-    port: 8080
-    is_secure: false
+
+backend:
+  domain: "status-backend"
+  port: 8080
+  is_secure: false
+
+api:
+  enable: true
+  host: "0.0.0.0"
+  port: 8081
 
 modules:
-  directories:
-    - ./modules
-  enabled: []
+  directories: []
+  enabled: ["messaging"]
   settings: {}
 
 prometheus:

@@ -3,6 +3,8 @@ import sys
 import signal
 import argparse
 
+from fastapi import FastAPI
+
 from bot import Account, Logger
 import bot
 from bot.config import Config
@@ -12,7 +14,7 @@ from postgres import Postgres
 
 
 def create_bot(config: Config, project_root: str) -> Account:
-    account = Account(**config.bot.params.model_dump())
+    account = Account(**config.backend.model_dump())
     available_accounts = [a["display_name"] for a in account.available_accounts]
 
     display_name = config.bot.display_name
@@ -100,6 +102,7 @@ def main():
     project_root = os.path.dirname(os.path.abspath(__file__))
 
     try:
+        logger.info(f"{config}")
         account = create_bot(config, project_root)
     except Exception as e:
         logger.error(f"Failed to create bot account: {e}")
@@ -123,7 +126,12 @@ def main():
     else:
         logger.info("No Postgres configuration found, running without database")
 
-    shared_state = {"config": config, "project_root": project_root}
+    fastapi_app = FastAPI(title="Status Bot API")
+    shared_state = {"config": config, "project_root": project_root, "fastapi_app": fastapi_app}
+
+    if config.api.enable and "api_server" not in config.modules.enabled:
+        config.modules.enabled.append("api_server")
+
     manager = ModuleManager(config.modules, account, db, logger, shared_state=shared_state)
     manager.discover_modules()
     manager.load_modules()

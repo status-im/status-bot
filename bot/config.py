@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import YamlConfigSettingsSource
 
 
-class BotParams(BaseModel):
+class BackendConfig(BaseModel):
     domain: str = "localhost"
     port: int = 8080
     is_secure: bool = False
@@ -18,8 +18,6 @@ class BotConfig(BaseModel):
     compressed_key: str = ""
     infura_token: str = ""
     coingecko_api_key: str = ""
-    params: BotParams = BotParams()
-
 
 class PostgresConfig(BaseModel):
     host: str = "database"
@@ -29,6 +27,12 @@ class PostgresConfig(BaseModel):
     name: str = ""
     schema: str = "public"
     tables: dict = {}
+
+
+class ApiConfig(BaseModel):
+    enable: bool = True
+    host: str = "0.0.0.0"
+    port: int = 8081
 
 
 class PrometheusConfig(BaseModel):
@@ -56,6 +60,8 @@ class Config(BaseSettings):
     sleep: int = 10
     files: FilesConfig = FilesConfig()
     bot: BotConfig = BotConfig()
+    backend: BackendConfig = BackendConfig()
+    api: ApiConfig = ApiConfig()
     modules: ModulesConfig = ModulesConfig()
     prometheus: PrometheusConfig = PrometheusConfig()
     postgres: PostgresConfig = PostgresConfig()

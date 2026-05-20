@@ -186,7 +186,6 @@ class Account:
         self.__info = {
             "public_key": event["public-key"],
             "url": None,
-            "emojis": event["emojiHash"],
             "key_uid": event["key-uid"],
             "compressed_key": event["compressedKey"],
             "mnemonic": event.get("mnemonic", mnemonic),
@@ -393,7 +392,6 @@ class Account:
                 "url": self.__call_rpc("urls", "shareUserURLWithData", [contact["id"]]).get("result"),
                 "chat_id": contact["id"],
                 "key_uid": contact["compressedKey"],
-                "emojis": contact["emojiHash"],
                 "contact_state": self.__mappings["contact_request"][contact["contactRequestState"]],
                 "external_contact_state": self.__mappings["contact_request"][contact["contactRequestRemoteState"]],
                 "has_added_us": contact["hasAddedUs"],
