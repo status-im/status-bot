@@ -64,9 +64,9 @@ bot:
     compressed_key: 'zQ3...'
 ```
 
-#### `bot.params`
+### `backend`
 
-Parameters passed to the `Account()` constructor.
+Parameter to connect to the Status Backend instance.
 
 | Field | Type | Default | Env var | Description |
 |-------|------|---------|---------|-------------|
@@ -74,18 +74,34 @@ Parameters passed to the `Account()` constructor.
 | `port` | `int` | `8080` | `BOT_PARAMS_PORT` | Status Backend API port |
 | `is_secure` | `bool` | `false` | `BOT_PARAMS_IS_SECURE` | Use HTTPS instead of HTTP |
 ```yaml
-bot:
-    params:
-        domain: "status-backend"
-        port: 8080
-        is_secure: false
-        infura_token: ""
-        coingecko_api_key: ""
+backend:
+    domain: "status-backend"
+    port: 8080
+    is_secure: false
 ```
 
 ---
 
-### `postgres`
+### `api`
+
+Configuration for the WebServer avaialable to the modules.
+
+| Field | Type | Default | Env var | Description |
+|-------|------|---------|---------|-------------|
+| `enable` | `bool` | `true` | `API_ENABLE` | Enable the REST API server |
+| `host` | `str` | `"0.0.0.0"` | `API_HOST` | API server bind address |
+| `port` | `int` | `8081` | `API_PORT` | API server port |
+
+```yaml
+api:
+    enable: true
+    host: "0.0.0.0"
+    port: 8081
+```
+
+---
+
+### `database`
 
 | Field | Type | Default | Env var | Description |
 |-------|------|---------|---------|-------------|
@@ -98,7 +114,7 @@ bot:
 | `tables` | `dict` | `{}` | — | Mapping of data type to table name |
 
 ```yaml
-postgres:
+database:
     host: database
     port: 5432
     user: 'myuser'
@@ -120,75 +136,31 @@ postgres:
 | `enabled` | `list[str]` | `[]` | List of module names to enable |
 | `settings` | `dict` | `{}` | Per-module settings (each module defines its own schema) |
 
+The `api_server` module is auto-loaded whenever `api.enable` is `true` — it does not need to be listed in `enabled`.
+
 ```yaml
 modules:
     directories:
         - ./modules
     enabled:
-        - monitoring
+        - messaging
     settings:
-        monitoring:
-            interval: 600
-            max_retries: 3
-            backoff_seconds: 30
+        messaging: {}
 ```
 
 ---
 
-### `prometheus`
+### `metrics`
 
 | Field | Type | Default | Env var | Description |
 |-------|------|---------|---------|-------------|
-| `enabled` | `bool` | `false` | `PROMETHEUS_ENABLED` | Enable Prometheus metrics HTTP server |
-| `host` | `str` | `"0.0.0.0"` | `PROMETHEUS_HOST` | Prometheus HTTP server bind address |
-| `port` | `int` | `8000` | `PROMETHEUS_PORT` | Prometheus HTTP server port |
+| `enabled` | `bool` | `false` | `METRICS_ENABLED` | Enable Prometheus metrics HTTP server |
+| `host` | `str` | `"0.0.0.0"` | `METRICS_HOST` | Prometheus HTTP server bind address |
+| `port` | `int` | `8000` | `METRICS_PORT` | Prometheus HTTP server port |
 
 ```yaml
-prometheus:
+metrics:
     enabled: true
     host: "0.0.0.0"
     port: 8000
-```
-
----
-
-## Environment variables
-
-All configuration fields can be set via environment variables using the `_` separator for nested fields.
-
-| Env var | Config path |
-|---------|-------------|
-| `BOT_DISPLAY_NAME` | `bot.display_name` |
-| `BOT_PASSWORD` | `bot.password` |
-| `BOT_MNEMONIC_PHRASE` | `bot.mnemonic_phrase` |
-| `BOT_INIT_ACCOUNT` | `bot.init_account` |
-| `BOT_PARAMS_DOMAIN` | `bot.params.domain` |
-| `BOT_PARAMS_PORT` | `bot.params.port` |
-| `BOT_PARAMS_IS_SECURE` | `bot.params.is_secure` |
-| `BOT_PARAMS_INFURA_TOKEN` | `bot.params.infura_token` |
-| `BOT_PARAMS_COINGECKO_API_KEY` | `bot.params.coingecko_api_key` |
-| `POSTGRES_HOST` | `postgres.host` |
-| `POSTGRES_PORT` | `postgres.port` |
-| `POSTGRES_USER` | `postgres.user` |
-| `POSTGRES_PASSWORD` | `postgres.password` |
-| `POSTGRES_NAME` | `postgres.name` |
-| `POSTGRES_SCHEMA` | `postgres.schema` |
-| `PROMETHEUS_ENABLED` | `prometheus.enabled` |
-| `PROMETHEUS_HOST` | `prometheus.host` |
-| `PROMETHEUS_PORT` | `prometheus.port` |
-
-Example `.env` file:
-
-```
-# Bot account
-BOT_DISPLAY_NAME=my-bot
-BOT_PASSWORD=ChangeThisPassword
-BOT_MNEMONIC_PHRASE=test test test test test test test test test test test test
-
-# Postgres
-POSTGRES_HOST=database
-POSTGRES_PORT=5432
-POSTGRES_NAME=status-bot
-POSTGRES_USER=status
-POSTGRES_PASSWORD=ChangeThisOneAlso
 ```

@@ -9,4 +9,6 @@
 ## Usage
 
 - [Configuration](./usage/configuration.md)
+- [API](./usage/api.md)
 - [Community Monitoring](./usage/monitoring.md)
+- [Metrics](./usage/metrics.md)

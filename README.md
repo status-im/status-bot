@@ -3,50 +3,31 @@
 ## Description
 
 This repository allow to run a Bot for the [Status App](https://status.app). The bot can be used for multiple reason:
-- Sending messaging (WIP)
+- [Interracting with Status Chats](./docs/usage/messaging.md)
 - [Monitoring Community](./docs/usage/monitoring.md)
 
 
 ## Setup
 
-### Configuration
-
-The bot is configured via `config.yaml` and environment variables.
-See the [full configuration reference](./docs/usage/configuration.md) for all options.
-
-Required settings:
-- **Bot account**: `bot.display_name`, `bot.password`, and `bot.compressed_key` in `config.yaml`
-- **Postgres** (optional): `POSTGRES_HOST`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_NAME` env vars
+The recommanded deployement option is with docker compose.
 
 ### Docker deployment
 
-Use the provided `docker-compose.yaml` to run the bot:
+The [docker compose](./docker-compose.yaml) deployement will spin 3 containers:
+- Status Backend: to interract with the Logos Delivery network used by Status App.
+- Status Bot: the instance of the bot
+- A Postgres database
+
+You can run it with:
 
 ```bash
-docker-compose up
+docker-compose up -d --build
 ```
+it will require a `.env` file for secrets and `config.yaml`. The configuration is detailed in [the documentation](./docs/usage//configuration.md).
 
-Minimal `.env` file:
+### Python
 
-```
-# Bot account (required)
-BOT_DISPLAY_NAME=bot-status
-BOT_PASSWORD=ChangeThisPassword
-BOT_MNEMONIC_PHRASE=test test test test test test test test test test test test
-
-# Wallet API for token-gated communities (optional)
-BOT_PARAMS_INFURA_TOKEN=your-infura-token
-BOT_PARAMS_COINGECKO_API_KEY=your-coingecko-key
-
-# Database (optional)
-POSTGRES_HOST=database
-POSTGRES_PORT=5432
-POSTGRES_NAME=status-bot
-POSTGRES_USER=status
-POSTGRES_PASSWORD=ChangeThisOneAlso
-```
-
-## Python
+You can also run the bot with python, it will require a Status Backend instance available.
 
 1. Setup environment. [Conda](https://www.anaconda.com/) example:
 ```bash
@@ -71,9 +52,7 @@ If you have already created a Status account and want to use it with it's curren
 - `BOT_PASSWORD`
 - `BOT_MNEMONIC_PHRASE`
 
-## Files
 
-- `main.py` - Entry point for running the bot with modules (monitoring, etc.)
 
 # Guidelines
 

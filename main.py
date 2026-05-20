@@ -5,12 +5,9 @@ import argparse
 
 from fastapi import FastAPI
 
-from bot import Account, Logger
-import bot
-from bot.config import Config
+from bot import Account, Logger, Config, Postgres
 from bot.metrics import start_prometheus
 from bot.modules.manager import ModuleManager
-from postgres import Postgres
 
 
 def create_bot(config: Config, project_root: str) -> Account:
@@ -66,11 +63,11 @@ def create_bot(config: Config, project_root: str) -> Account:
 
 def init_postgres(config: Config) -> Postgres:
     return Postgres(
-        host=config.postgres.host,
-        port=config.postgres.port,
-        user=config.postgres.user,
-        password=config.postgres.password,
-        database=config.postgres.name,
+        host=config.database.host,
+        port=config.database.port,
+        user=config.database.user,
+        password=config.database.password,
+        database=config.database.name,
     )
 
 
@@ -110,10 +107,10 @@ def main():
 
     db = None
     has_postgres = all([
-        config.postgres.host,
-        config.postgres.user,
-        config.postgres.password,
-        config.postgres.name,
+        config.database.host,
+        config.database.user,
+        config.database.password,
+        config.database.name,
     ])
 
     if has_postgres:
@@ -136,7 +133,7 @@ def main():
     manager.discover_modules()
     manager.load_modules()
 
-    start_prometheus(config.prometheus, manager, logger)
+    start_prometheus(config.metrics, manager, logger)
 
     stop_event = manager._stop_event
 

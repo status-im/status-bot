@@ -19,7 +19,7 @@ class BotConfig(BaseModel):
     infura_token: str = ""
     coingecko_api_key: str = ""
 
-class PostgresConfig(BaseModel):
+class DatabaseConfig(BaseModel):
     host: str = "database"
     port: int = 5432
     user: str = ""
@@ -35,7 +35,7 @@ class ApiConfig(BaseModel):
     port: int = 8081
 
 
-class PrometheusConfig(BaseModel):
+class MetricsConfig(BaseModel):
     enabled: bool = False
     host: str = "0.0.0.0"
     port: int = 8000
@@ -63,8 +63,8 @@ class Config(BaseSettings):
     backend: BackendConfig = BackendConfig()
     api: ApiConfig = ApiConfig()
     modules: ModulesConfig = ModulesConfig()
-    prometheus: PrometheusConfig = PrometheusConfig()
-    postgres: PostgresConfig = PostgresConfig()
+    metrics: MetricsConfig = MetricsConfig()
+    database: DatabaseConfig = DatabaseConfig()
 
     _yaml_file = "./config.yaml"
 
