@@ -157,13 +157,11 @@ class Account:
 
         # Wallet usage
         if infura_token:
-            self.logger.info("Adding Infura token")
             params["infuraToken"] = infura_token
         else:
             self.logger.info("No infura token")
 
         if coingecko_api_key:
-            self.logger.info("Adding CoinGechko token")
             params["coingeckoApiKey"] = coingecko_api_key
         else:
             self.logger.info("No coingecko token")
@@ -530,6 +528,7 @@ class Account:
         params = [[self.info["wallet_address"]], True]
         results = self.__call_rpc("wallets", "fetchOrGetCachedWalletBalances", params).get("result", {}).get(self.info["wallet_address"].lower(), [])
         if not results:
+            self.logger.warning(f"No result in RPC response")
             return empty.copy()
 
         balance = pd.DataFrame(results)

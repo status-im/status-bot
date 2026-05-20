@@ -5,7 +5,6 @@ from bot.modules.manager import ModuleManager
 from prometheus_client import start_http_server, Gauge, Counter
 
 
-
 def start_prometheus(prometheus_config: PrometheusConfig, manager: ModuleManager, logger: logging.Logger):
     if not prometheus_config.enabled:
         logger.info("Prometheus metrics disabled")

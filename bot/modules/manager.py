@@ -31,7 +31,12 @@ class ModuleManager:
         return list(self._modules.keys())
 
     def discover_modules(self) -> None:
+        builtin_dir = str(Path(__file__).parent.resolve())
+        self._discover_from_directory(builtin_dir)
+
         for directory in self._modules_config.directories:
+            if directory == builtin_dir:
+                continue
             self._discover_from_directory(directory)
 
         self._logger.info(
