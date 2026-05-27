@@ -10,7 +10,19 @@ The bot exposes a REST endpoint for sending messages, managing contacts, and que
 | ReDoc | `http://localhost:8081/redoc` |
 | OpenAPI JSON | `http://localhost:8081/openapi.json` |
 
-No authentication is required.
+## Authentication
+
+If `api.api_key` is configured in `config.yaml`, all requests (except `/health`, `/docs`, `/redoc`, and `/openapi.json`) must include the `X-API-Key` header:
+
+```bash
+curl -H "X-API-Key: your-secret-key" http://localhost:8081/api/v1/chats
+```
+
+Requests without a valid key return `401 Unauthorized`:
+
+```json
+{"detail": "Invalid or missing API key"}
+```
 
 ---
 

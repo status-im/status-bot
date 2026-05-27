@@ -9,6 +9,6 @@
 ## Usage
 
 - [Configuration](./usage/configuration.md)
-- [API](./usage/api.md)
+- [Messaging API](./usage/messaging.md)
 - [Community Monitoring](./usage/monitoring.md)
 - [Metrics](./usage/metrics.md)

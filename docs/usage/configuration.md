@@ -91,12 +91,14 @@ Configuration for the WebServer avaialable to the modules.
 | `enable` | `bool` | `true` | `API_ENABLE` | Enable the REST API server |
 | `host` | `str` | `"0.0.0.0"` | `API_HOST` | API server bind address |
 | `port` | `int` | `8081` | `API_PORT` | API server port |
+| `api_key` | `str` | `""` | `API_API_KEY` | API key for request authentication (empty = disabled) |
 
 ```yaml
 api:
     enable: true
     host: "0.0.0.0"
     port: 8081
+    # api_key: "your-secret-key"
 ```
 
 ---
