@@ -156,8 +156,7 @@ class MonitoringModule(BaseModule):
 
     def _store(self, upload_path: str, current_state_path: str, config, logger) -> None:
         path = Path(upload_path)
-        table_name_mapping: dict[str, str] = config.postgres.tables
-        table_schema = config.postgres.schema
+        table_name_mapping: dict[str, str] = config.database.tables
 
         upload: dict[str, list] = {}
         latest_dates: dict[str, pd.Timestamp] = (
@@ -206,8 +205,8 @@ class MonitoringModule(BaseModule):
                 if len(df[column].dropna()) > 0
                 and isinstance(df[column].dropna().reset_index(drop=True).iloc[0], (dict, list))
             ]
-            connector.insert(df, table_name, table_schema, json_columns)
-            logger.info(f"Uploaded {len(df)} record(s) to {table_schema}.{table_name}")
+            connector.insert(df, table_name, json_columns)
+            logger.info(f"Uploaded {len(df)} record(s) to {table_name}")
 
         for file_path in completed:
             os.remove(file_path)

@@ -5,7 +5,7 @@ import argparse
 
 from fastapi import FastAPI
 
-from bot import Account, Logger, Config, Postgres
+from bot import Account, Logger, Config, Database
 from bot.metrics import start_prometheus
 from bot.modules.manager import ModuleManager
 
@@ -61,13 +61,15 @@ def create_bot(config: Config, project_root: str) -> Account:
     return account
 
 
-def init_postgres(config: Config) -> Postgres:
-    return Postgres(
+def init_database(config: Config) -> Database:
+    return Database(
+        db_type=config.database.type,
         host=config.database.host,
         port=config.database.port,
         user=config.database.user,
         password=config.database.password,
-        database=config.database.name,
+        name=config.database.name,
+        schema=config.database.schema,
     )
 
 
@@ -106,22 +108,23 @@ def main():
         sys.exit(1)
 
     db = None
-    has_postgres = all([
+    has_database = all([
         config.database.host,
         config.database.user,
         config.database.password,
         config.database.name,
     ])
 
-    if has_postgres:
+    if has_database:
         try:
-            db = init_postgres(config)
-            logger.info("Postgres connection established")
+            db = init_database(config)
+            db.init_tables()
+            logger.info(f"Database connection established ({config.database.type})")
         except Exception as e:
-            logger.warning(f"Failed to connect to Postgres: {e}")
+            logger.warning(f"Failed to connect to database: {e}")
             logger.warning("Continuing without database connection")
     else:
-        logger.info("No Postgres configuration found, running without database")
+        logger.info("No database configuration found, running without database")
 
     fastapi_app = FastAPI(title="Status Bot API")
     shared_state = {"config": config, "project_root": project_root, "fastapi_app": fastapi_app}

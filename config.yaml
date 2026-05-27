@@ -1,4 +1,5 @@
-postgres:
+database:
+  type: postgres
   host: "database"
   port: 5432
   schema: "status_app_monitoring"
@@ -13,7 +14,7 @@ files:
   current_state: "dates.pkl"
 
 bot:
-  init_account: false
+  init_account: true
   display_name: 'e-raccoon'
   public_key: "0xExample"
   compressed_key: "example-compressed-key"
@@ -31,8 +32,11 @@ api:
 
 modules:
   directories: []
-  enabled: ["messaging"]
-  settings: {}
+  enabled: ["messaging", "receiver"]
+  settings:
+    receiver:
+      messages_table: "received_messages"
+      chats_table: "received_chats"
 
 prometheus:
   enabled: true

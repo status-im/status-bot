@@ -20,6 +20,7 @@ class BotConfig(BaseModel):
     coingecko_api_key: str = ""
 
 class DatabaseConfig(BaseModel):
+    type: str = "postgres"
     host: str = "database"
     port: int = 5432
     user: str = ""

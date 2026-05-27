@@ -105,18 +105,23 @@ api:
 
 ### `database`
 
+Supports **Postgres** and **SQLite** (SQLite via `type: sqlite`, where `name` is the file path).
+
 | Field | Type | Default | Env var | Description |
 |-------|------|---------|---------|-------------|
-| `host` | `str` | `"database"` | `POSTGRES_HOST` | Postgres server hostname |
-| `port` | `int` | `5432` | `POSTGRES_PORT` | Postgres server port |
-| `user` | `str` | `""` | `POSTGRES_USER` | Postgres username |
-| `password` | `str` | `""` | `POSTGRES_PASSWORD` | Postgres password |
-| `name` | `str` | `""` | `POSTGRES_NAME` | Postgres database name |
-| `schema` | `str` | `"public"` | `POSTGRES_SCHEMA` | Database schema for storing data |
+| `type` | `str` | `"postgres"` | `DATABASE_TYPE` | Database engine (`postgres` or `sqlite`) |
+| `host` | `str` | `"database"` | `DATABASE_HOST` | Database server hostname (Postgres) |
+| `port` | `int` | `5432` | `DATABASE_PORT` | Database server port (Postgres) |
+| `user` | `str` | `""` | `DATABASE_USER` | Database username (Postgres) |
+| `password` | `str` | `""` | `DATABASE_PASSWORD` | Database password (Postgres) |
+| `name` | `str` | `""` | `DATABASE_NAME` | Database name (Postgres) or file path (SQLite) |
+| `schema` | `str` | `"public"` | `DATABASE_SCHEMA` | Database schema (Postgres) |
 | `tables` | `dict` | `{}` | — | Mapping of data type to table name |
 
+Postgres example:
 ```yaml
 database:
+    type: postgres
     host: database
     port: 5432
     user: 'myuser'
@@ -126,6 +131,13 @@ database:
     tables:
         messages: "raw_messages"
         community: "raw_community_info"
+```
+
+SQLite example:
+```yaml
+database:
+    type: sqlite
+    name: "/data/status-bot.db"
 ```
 
 ---

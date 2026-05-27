@@ -1,4 +1,4 @@
 from .account import Account
 from .logger import Logger
-from .postgres import Postgres
+from .database import Database
 from .config import Config
