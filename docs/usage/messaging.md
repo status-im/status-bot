@@ -158,6 +158,40 @@ Response `201`:
 
 ---
 
+### `GET /api/v1/communities`
+
+Return all the communities.
+
+```bash
+curl http://localhost:8081/api/v1/communities
+```
+
+---
+
+### `POST /api/v1/communities/request`
+
+```bash
+curl -X POST http://localhost:8081/api/v1/communities/request \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello from the bot!"}'
+```
+
+Request body:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `url` | `string` | Yes | Community url |
+
+Response `201`:
+```json
+{
+    "status": "request_send"
+    "request_time": time of the request
+}
+```
+
+---
+
 ## Error handling
 
 All errors return a JSON body with a `detail` field:

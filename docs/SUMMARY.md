@@ -1,14 +1,25 @@
 # Summary
 
+
+## Principle
+
+- [Architecture](./overivew.md#architecture)
+- [Account](./overview.md#account-setup)
+
 ## Development
 
-- [Account](./development//account.md)
 - [Modules](./development/modules.md)
 
 
-## Usage
+## Usages
 
-- [Configuration](./usage/configuration.md)
 - [Messaging API](./usage/messaging.md)
 - [Community Monitoring](./usage/monitoring.md)
-- [Metrics](./usage/metrics.md)
+- [Receiver](/usage/receiver.md)
+
+## Deployement
+
+- [Docker Deployement](./deployement/docker.md)
+- [Configuration](./deployement/configuration.md)
+- [Metrics](./deployement/metrics.md)
+
