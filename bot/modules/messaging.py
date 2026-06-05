@@ -15,6 +15,8 @@ class AddContactRequest(BaseModel):
 class SendMessageRequest(BaseModel):
     text: str
 
+class SendRequestCommunityRequest(BaseModel):
+    url: str
 
 class MessagingModule(BaseModule):
 
@@ -94,6 +96,15 @@ class MessagingModule(BaseModule):
         @app.get("/api/v1/communities")
         def get_communities():
             return account.communities
+
+        @app.post("/api/v1/communities/request", status_code=201)
+        def send_request_community(payload: SendRequestCommunityRequest):
+            if not payload.url:
+                raise HTTPException(status_code=400, detail="Community url is required")
+            request_time = account.send_request_community(payload.url)
+            if not request_time:
+                raise HTTPException(status_code=400, detail="Error when trying to send the community request")
+            return {"status": "request send", "request_time": request_time}
 
     def execute(self):
         self.ctx.stop_event.wait()
