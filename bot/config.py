@@ -5,12 +5,12 @@ from pydantic_settings.sources import YamlConfigSettingsSource
 
 class BackendConfig(BaseModel):
     domain: str = "localhost"
-    port: int = 8080
+    backend_port: int = 8080
     is_secure: bool = False
 
 
 class BotConfig(BaseModel):
-    display_name: str = ""
+    name: str = ""
     public_key: str = ""
     password: str = ""
     mnemonic_phrase: str = ""

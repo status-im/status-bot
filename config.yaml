@@ -17,11 +17,11 @@ bot:
   init_account: true
   display_name: 'e-raccoon'
   public_key: "0xExample"
-  compressed_key: "example-compressed-key"
+  #compressed_key: "example-compressed-key"
 
 backend:
   domain: "status-backend"
-  port: 8080
+  backend_port: 8080
   is_secure: false
 
 api:

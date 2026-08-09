@@ -5,22 +5,23 @@ import argparse
 
 from fastapi import FastAPI
 
-from bot import Account, Logger, Config, Database
+from status_sdk import Account
+from bot import Config, Database, Logger
 from bot.metrics import start_prometheus
 from bot.modules.manager import ModuleManager
 
 
 def create_bot(config: Config, project_root: str) -> Account:
     account = Account(**config.backend.model_dump())
-    available_accounts = [a["display_name"] for a in account.available_accounts]
+    available_accounts = [a["name"] for a in account.available_accounts]
 
-    display_name = config.bot.display_name
+    name = config.bot.name
     password = config.bot.password
 
-    if display_name in available_accounts:
-        account.logger.info(f"Logging in with display name: {display_name}")
+    if name in available_accounts:
+        account.logger.info(f"Logging in with display name: {name}")
         account.login(
-            display_name=display_name,
+            name=name,
             password=password,
             infura_token=config.bot.infura_token,
             coingecko_api_key=config.bot.coingecko_api_key
@@ -31,9 +32,9 @@ def create_bot(config: Config, project_root: str) -> Account:
             raise ValueError(
                 "init_account is true but no mnemonic_phrase provided"
             )
-        account.logger.info(f"Creating/restoring account: {display_name}")
+        account.logger.info(f"Creating/restoring account: {name}")
         account.login(
-            display_name=display_name,
+            name=name,
             password=password,
             mnemonic=mnemonic,
             infura_token=config.bot.infura_token,
@@ -41,7 +42,7 @@ def create_bot(config: Config, project_root: str) -> Account:
         )
     else:
         raise ValueError(
-            f"Account '{display_name}' not found and init_account is false. "
+            f"Account '{name}' not found and init_account is false. "
             f"Available accounts: {[a['display_name'] for a in available_accounts]}"
         )
 

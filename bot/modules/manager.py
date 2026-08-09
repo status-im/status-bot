@@ -197,7 +197,7 @@ class ModuleManager:
             self._stop_event.wait(interval)
 
     def _run_event(self, module: BaseModule) -> None:
-        for event in self._account.signal.listen("messages.new", stop_event=self._stop_event):
+        for event in self._account.listen_messages():
             if self._stop_event.is_set():
                 break
             try:
