@@ -1,0 +1,30 @@
+[project]
+name = "status-bot"
+version = "0.2.0"
+description = "A modular bot for Status App that automates tasks, responds to commands, and integrates with APIs."
+requires-python = ">=3.11"
+license-files = ["LICENSE.md"]
+authors = [{name = "status-im"}]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "pydantic-settings",
+    "python-dotenv",
+    "psycopg2-binary",
+    "sqlalchemy",
+    "prometheus-client",
+    "status-sdk>=1.1.0",
+    "pyyaml",
+    "pandas",
+]
+
+[project.scripts]
+status-bot = "main:main"
+
+[build-system]
+requires = ["setuptools>=70.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["bot", "bot.*"]
