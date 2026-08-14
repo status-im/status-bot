@@ -52,6 +52,7 @@ files:
 | `compressed_key` | `str` | `""` | — | Expected compressed key for verification after login |
 | `infura_token` | `str` | `""` | `BOT_INFURA_TOKEN` | [Infura token](https://www.infura.io/) required for token-gated communities |
 | `coingecko_api_key` | `str` | `""` | `BOT_COINGECKO_API_KEY` | [CoinGecko API key](https://www.coingecko.com/) required for token-gated communities |
+| `bot_hash_pepper` | `str` | `""` | `BOT__BOT_HASH_PEPPER` | Secret key used for HMAC-SHA256 hashing of stored messages (see [Privacy & storage](#privacy--storage)) |
 
 
 ```yaml
@@ -139,6 +140,36 @@ database:
     type: sqlite
     name: "/data/status-bot.db"
 ```
+
+---
+
+## Privacy & storage
+
+The `receiver` module hashes identifying and content-bearing fields before persisting messages and chats, so no human-readable user data is stored at rest.
+
+| Field | Env var | Description |
+|-------|---------|-------------|
+| `bot.bot_hash_pepper` | `BOT__BOT_HASH_PEPPER` | Secret key used for HMAC-SHA256 hashing. Must be stable across restarts (changing it breaks dedup and changes all stored hashes). If unset, the bot logs a warning and falls back to plain SHA-256 — content is then not protected against dictionary attacks |
+
+**Hashing scheme:**
+
+- **Deterministic (HMAC, pepper only):** identity/correlation fields, so `id` stays stable for dedup and a key-holder can correlate sender/chat.
+
+| Entity | Columns |
+|--------|---------|
+| Messages | `id`, `from`, `response_to`, `chat_id`, `local_chat_id` |
+| Chats | `id` |
+
+- **Salted (HMAC with a random per-row `salt`, stored in the `salt` column):** message content. Each row gets a unique random salt, so identical content produces different digests across rows (no cross-row content correlation, even for a key-holder).
+
+| Entity | Columns |
+|--------|---------|
+| Messages | `text`, `display_name`, `ens_name`, `alias` |
+| Chats | `name` |
+
+**Dropped entirely (messages):** `parsed_text`, `quoted_message`, `emoji_hash`, `gap_parameters`. Any other structured (dict/list) column is dropped with a logged warning.
+
+Event payloads are kept in plaintext in-memory so they can be handled correctly; only the persisted copy is hashed. Rows stored before this behavior was introduced are not backfilled.
 
 ---
 

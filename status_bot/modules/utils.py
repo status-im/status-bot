@@ -1,4 +1,6 @@
 import datetime
+import hmac
+import logging
 import os
 import pickle
 from hashlib import sha256
@@ -6,9 +8,32 @@ from hashlib import sha256
 import pandas as pd
 from typing import Any
 
+logger = logging.getLogger("status_bot.utils")
+
+_PEPPER_WARNED = False
+
 
 def to_sha256_hash(value: str) -> str:
     return sha256(value.encode()).hexdigest()
+
+
+def to_hmac_sha256_hash(value: str, pepper: str = "", salt: str = "") -> str:
+    global _PEPPER_WARNED
+    if pepper:
+        return hmac.new(
+            pepper.encode(), (salt + value).encode(), sha256
+        ).hexdigest()
+    if not _PEPPER_WARNED:
+        _PEPPER_WARNED = True
+        logger.warning(
+            "bot.bot_hash_pepper is not set, falling back to plain SHA-256 "
+            "hashing (content is not protected against dictionary attacks)"
+        )
+    return to_sha256_hash(value)
+
+
+def generate_salt() -> str:
+    return os.urandom(16).hex()
 
 
 def to_midnight(timestamp: datetime.datetime) -> datetime.datetime:

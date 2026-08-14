@@ -18,6 +18,7 @@ bot:
   display_name: 'e-raccoon'
   public_key: "0xExample"
   #compressed_key: "example-compressed-key"
+  bot_hash_pepper: '' #Use a large random value
 
 backend:
   domain: "status-backend"

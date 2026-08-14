@@ -125,8 +125,23 @@ The signal listener respects `stop_event` for graceful shutdown.
 | Function | Description |
 |----------|-------------|
 | `to_sha256_hash(value)` | Returns the SHA-256 hex digest of a string |
+| `to_hmac_sha256_hash(value, pepper, salt)` | Returns the HMAC-SHA256 hex digest of a string, keyed with the `bot.bot_hash_pepper` config value and an optional per-row `salt`. Falls back to plain `to_sha256_hash` (with a one-time warning) when the pepper is empty |
+| `generate_salt()` | Returns a random 16-byte hex string used as a per-row salt |
 | `to_midnight(timestamp)` | Truncates a datetime to the start of its day |
 | `save_file(file_path, data)` | Saves a DataFrame as CSV or pickles any other object |
+
+---
+
+## Message storage & privacy
+
+The `receiver` module persists received messages and chats to the configured Postgres database. Before insertion, identifying and content-bearing fields are hashed with `to_hmac_sha256_hash` so no human-readable user data is stored at rest:
+
+- **Messages — deterministic (pepper only):** `id`, `from`, `response_to`, `chat_id`, `local_chat_id`. `id` stays stable so primary-key dedup keeps working.
+- **Messages — salted (random per-row `salt` column):** `display_name`, `ens_name`, `alias`, `text`. Identical content produces different digests across rows.
+- **Chats — deterministic:** `id`; **salted:** `name`.
+- **Dropped entirely (messages):** `parsed_text`, `quoted_message`, `emoji_hash`, `gap_parameters`.
+
+Any unexpected column containing structured data (dict/list) is dropped with a logged warning rather than stored. The event payload is never modified — plaintext remains available in-memory for handling; only the persisted copy is hashed. Hashing is applied at insert time, so rows stored before this behavior was introduced are left as-is.
 
 ---
 

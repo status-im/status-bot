@@ -10,3 +10,4 @@ class ReceivedChat(Base):
     type = Column(String, nullable=True)
     name = Column(String, nullable=True)
     received_timestamp = Column(DateTime, nullable=True)
+    salt = Column(String, nullable=True)

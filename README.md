@@ -25,24 +25,14 @@ docker-compose up -d --build
 ```
 it will require a `.env` file for secrets and `config.yaml`. The configuration is detailed in [the documentation](./docs/usage//configuration.md).
 
-### Python
 
-You can also run the bot with python, it will require a Status Backend instance available.
+### Tests
 
-1. Setup environment. [Conda](https://www.anaconda.com/) example:
+The differents test suites can be run with:
 ```bash
-conda create -n status-monitoring python=3.12
+pip install -e ".[dev]"
+pytest test/
 ```
-
-**Note**: Code has been tested with **Python 3.12**.
-
-2. Install requirements
-
-```bash
-pip install -r requirements.txt
-```
-
-**Note**: If you are on Windows, you will have to install `psycopg2` instead of `psycopg2-binary`.
 
 # Backups
 

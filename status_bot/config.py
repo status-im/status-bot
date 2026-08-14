@@ -18,6 +18,7 @@ class BotConfig(BaseModel):
     compressed_key: str = ""
     infura_token: str = ""
     coingecko_api_key: str = ""
+    bot_hash_pepper: str = ""
 
 class DatabaseConfig(BaseModel):
     type: str = "postgres"
