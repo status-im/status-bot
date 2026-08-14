@@ -1,7 +1,7 @@
 import logging
 
-from bot.config import MetricsConfig
-from bot.modules.manager import ModuleManager
+from status_bot.config import MetricsConfig
+from status_bot.modules.manager import ModuleManager
 from prometheus_client import start_http_server, Gauge, Counter
 
 

@@ -88,7 +88,7 @@ Returns the current `Account` instance, allowing method chaining.
 
 #### Login with `display_name`
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -107,7 +107,7 @@ The code above is equivalent to the following screen on Status App:
 #### Login with `key_uid`
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -120,7 +120,7 @@ account.login(**params)
 #### Recover account
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -140,7 +140,7 @@ The code above is equivalent to the following screen on Status App:
 #### Wallet setup
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 
@@ -160,7 +160,7 @@ account.login(**params)
 Logout from the currently logged-in Status account. This method also clears the internal account state and stops the active messenger session. This function is also supported in `del` and when the script automatically finishes.
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -184,7 +184,7 @@ Create a **local backup file** (`.bkp`) for the currently logged‑in account. T
 Returns `str` representing the **Docker path** of the generated backup file. The returned path refers to the **Docker container path** where the backup was created. If the backup directory is mounted as a Docker volume, the file will also appear on the host machine in the mapped folder.
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -209,7 +209,7 @@ Send a text message to a specific chat. This method currently supports **text me
 | `message` | `str` | Yes | The text message to send. |
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -240,7 +240,7 @@ Messages can be fetched from:
 Returns `list[dict]` containing message objects. Timestamp fields returned by the backend are automatically converted into `datetime.datetime` objects.
 
 ```python
-from bot import Account
+from status_bot import Account
 import datetime
 
 account = Account()
@@ -268,7 +268,7 @@ for message in messages:
 Listen for new incoming messages **in real time**. This method yields raw message events as they are received from the Status Backend [signal](./account.md#signallisten) `messages.new`. This method is ideal for developing real time chat applications
 
 ```python
-from bot import Account
+from status_bot import Account
 import datetime
 # For terminal readability only
 from rich import print as rprint
@@ -310,7 +310,7 @@ Modes:
 Returns the current `Account` instance, allowing method chaining.
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -353,7 +353,7 @@ Returns `bool`.
 | `False` | The contact does not exist or was already removed. |
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -383,7 +383,7 @@ Send a request to join a community using its invitation URL. The method parses t
 Returns `datetime.datetime` representing when the join request was submitted.
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -416,7 +416,7 @@ Returns `pd.DataFrame`.
 | `source_id` | `str` | Source list from which the token was fetched. |
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 
@@ -448,7 +448,7 @@ Returns `pd.DataFrame`.
 | `price` | `float` | Token price **for 1 `token_symbol`** in the given fiat currency (only present if `ccy` is provided). If you want to get the amount in the wallet, you must `amount * price`. |
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 
@@ -474,7 +474,7 @@ data = account.get_balance(token_addresses)
 Access multuple chains:
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 
@@ -501,7 +501,7 @@ data = account.get_balance(token_addresses, chain_ids)
 Access multiple wallets:
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 
@@ -532,7 +532,7 @@ data = account.get_balance(token_addresses, chain_ids, wallets)
 Get token prices:
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 
@@ -599,7 +599,7 @@ This property is useful when you want to:
 Returns `list[dict]`.
 
 ```python
-from bot import Account
+from status_bot import Account
 # For terminal readability only
 from rich import print as rprint
 from rich.pretty import Pretty
@@ -627,7 +627,7 @@ Provides information about the currently logged-in account. If `login()` has not
 | `logged_in_timestamp` | `datetime.datetime` | Timestamp when the account successfully logged in. |
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -646,7 +646,7 @@ Get or update the current display name of the logged‑in account.
 Returns `str` when reading the property.
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -662,7 +662,7 @@ print(account.display_name)
 You can update the display name by assigning a new value:
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -685,7 +685,7 @@ Get or update the **bio** of the currently logged‑in account. The length of th
 Returns `str` when reading the property.
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -701,7 +701,7 @@ print(account.bio)
 The value assigned to `bio` will automatically be converted to a string before being sent to the backend. You can update the bio by assigning a new value:
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -718,7 +718,7 @@ print(account.bio)
 You can also **clear the bio** by deleting the property:
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -740,7 +740,7 @@ Get or update the **profile picture** of the currently logged‑in account. The 
 Returns `PIL.Image.Image` when reading the property, or `None` if no profile picture has been set.
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -758,7 +758,7 @@ if image:
 The file path assigned to `profile_picture` will be automatically set as the latest profile picture in Status App. If the given file does not exist or the extension is not supported, an **exception will be raised**. Supported image formats are `.jpg`, `.jpeg` and `.png`.
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -805,7 +805,7 @@ Default logger configuration:
 Example:
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 
@@ -851,7 +851,7 @@ Returns `dict[str, dict]` where the key is the contact's **public key**. This ma
 | `last_updated` | `datetime.datetime` | Timestamp when the contact information was last updated. |
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -919,7 +919,7 @@ Channel permissions:
 | `token_gated` | `bool` | Whether the channel requires a token to participate. |
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -951,7 +951,7 @@ Returns `list[dict]` where each `dict` represents a chat that can be used with [
 | `name` | `str` | Either the display name of the user or the community channel name. |
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 params = {
@@ -981,7 +981,7 @@ Returns `dict[int, str]`.
 
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 
@@ -1010,7 +1010,7 @@ Returns `pd.DataFrame`.
 | `symbol` | `str` | Token symbol (e.g. `ETH`, `USDT`). |
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 
@@ -1027,7 +1027,7 @@ print(account.balance)
 You can convert the current balance into fiat currency by using a [ISO 4217 currency code](https://www.iso.org/iso-4217-currency-codes.html) in the `[]` accessor:
 
 ```python
-from bot import Account
+from status_bot import Account
 
 account = Account()
 

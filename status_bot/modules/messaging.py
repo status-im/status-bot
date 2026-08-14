@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from bot.modules.base import BaseModule, ModuleType
+from status_bot.modules.base import BaseModule, ModuleType
 
 
 class AddContactRequest(BaseModel):

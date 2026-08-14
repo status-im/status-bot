@@ -4,7 +4,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from bot.modules.base import BaseModule, ModuleType
+from status_bot.modules.base import BaseModule, ModuleType
 
 
 class APIServerModule(BaseModule):

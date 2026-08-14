@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from bot.modules.base import BaseModule, ModuleType
-from bot.modules.utils import save_file, to_midnight, to_sha256_hash
+from status_bot.modules.base import BaseModule, ModuleType
+from status_bot.modules.utils import save_file, to_midnight, to_sha256_hash
 
 
 def extract_community_channels(account, community: dict, latest_dates: dict[str, pd.Timestamp]) -> pd.DataFrame:

@@ -6,7 +6,7 @@ from typing import Optional, Type
 from pathlib import Path
 
 from .base import BaseModule, ModuleConfig, ModuleContext, ModuleType
-from bot.config import ModulesConfig
+from status_bot.config import ModulesConfig
 
 
 class ModuleManager:
@@ -63,7 +63,7 @@ class ModuleManager:
 
         bot_modules_dir = Path(__file__).parent.resolve()
         if file_path.parent.resolve() == bot_modules_dir:
-            pkg_name = f"bot.modules.{module_name}"
+            pkg_name = f"status_bot.modules.{module_name}"
         else:
             pkg_name = f"modules.{module_name}"
 

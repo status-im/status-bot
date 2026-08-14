@@ -2,8 +2,8 @@ import datetime
 
 import pandas as pd
 
-from bot.modules.base import BaseModule, ModuleType
-from bot.modules.utils import to_sha256_hash
+from status_bot.modules.base import BaseModule, ModuleType
+from status_bot.modules.utils import to_sha256_hash
 
 
 class ReceiverModule(BaseModule):

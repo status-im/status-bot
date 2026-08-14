@@ -6,9 +6,9 @@ import argparse
 from fastapi import FastAPI
 
 from status_sdk import Account
-from bot import Config, Database, Logger
-from bot.metrics import start_prometheus
-from bot.modules.manager import ModuleManager
+from status_bot import Config, Database, Logger
+from status_bot.metrics import start_prometheus
+from status_bot.modules.manager import ModuleManager
 
 
 def create_bot(config: Config, project_root: str) -> Account:

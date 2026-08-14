@@ -17,7 +17,7 @@ Modules are plugins that extend the bot with custom logic. Each module runs in i
 ## BaseModule API
 
 ```python
-from bot.modules.base import BaseModule, ModuleType
+from status_bot.modules.base import BaseModule, ModuleType
 
 class MyModule(BaseModule):
 
@@ -120,7 +120,7 @@ The signal listener respects `stop_event` for graceful shutdown.
 
 ## Utility functions
 
-`bot/modules/utils.py` provides shared helpers:
+`status_bot/modules/utils.py` provides shared helpers:
 
 | Function | Description |
 |----------|-------------|
