@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import YamlConfigSettingsSource
 
@@ -21,6 +21,8 @@ class BotConfig(BaseModel):
     bot_hash_pepper: str = ""
 
 class DatabaseConfig(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     type: str = "postgres"
     host: str = "database"
     port: int = 5432

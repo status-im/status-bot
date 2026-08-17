@@ -1,12 +1,17 @@
+import datetime
 import logging
 
 import pandas as pd
 from typing import Optional
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import DateTime, create_engine, inspect, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError, NoSuchTableError
+from sqlalchemy.orm import sessionmaker
 
-from .models import Base
+from .models import MODEL_BY_TABLE, Base
+from .modules.utils import camel_to_snake
+
+TIMESTAMP_DIVISOR = 1_000
 
 
 class Database:
@@ -16,6 +21,7 @@ class Database:
         self._schema = schema
         self._url = self._build_url(db_type, host, port, user, password, name)
         self._engine = create_engine(self._url)
+        self._session_factory = sessionmaker(bind=self._engine)
         self._logger = logging.getLogger("status_bot.database")
 
     def init_tables(self):
@@ -29,6 +35,9 @@ class Database:
             return f"sqlite:///{name}"
         raise ValueError(f"Unsupported database type: {db_type}")
 
+    def session(self):
+        return self._session_factory()
+
     def insert(self, data: pd.DataFrame, table_name: str, json_columns: Optional[list] = None):
         if len(data) == 0:
             return
@@ -36,6 +45,11 @@ class Database:
         if self._type == "postgres":
             with self._engine.begin() as conn:
                 conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {self._schema}"))
+
+        model = MODEL_BY_TABLE.get(table_name)
+        if model is not None:
+            self._insert_with_model(data, table_name, model)
+            return
 
         data.columns = [column.lower() for column in data.columns]
 
@@ -62,6 +76,54 @@ class Database:
             data.to_sql(**params)
         except IntegrityError:
             self._logger.warning(f"Duplicate rows skipped in {table_name}")
+
+    def _insert_with_model(self, data: pd.DataFrame, table_name: str, model):
+        data.columns = [camel_to_snake(column) for column in data.columns]
+
+        table = model.__table__
+        model_columns = set(table.columns.keys())
+        drop_columns = [column for column in data.columns if column not in model_columns]
+        if drop_columns:
+            self._logger.warning(
+                f"Dropping non-model column(s) from {table_name}: {drop_columns}"
+            )
+            data = data.drop(columns=drop_columns)
+
+        if len(data) == 0:
+            return
+
+        timestamp_columns = {
+            column.name for column in table.columns if isinstance(column.type, DateTime)
+        }
+        column_to_attribute = {
+            attribute.expression.name: attribute.key
+            for attribute in model.__mapper__.column_attrs
+        }
+
+        rows = []
+        for record in data.to_dict("records"):
+            kwargs = {}
+            for key, value in record.items():
+                if key not in column_to_attribute:
+                    continue
+                if isinstance(value, (dict, list)):
+                    continue
+                if pd.isna(value):
+                    value = None
+                elif key in timestamp_columns and isinstance(value, (int, float)):
+                    value = datetime.datetime.fromtimestamp(value / TIMESTAMP_DIVISOR)
+                kwargs[column_to_attribute[key]] = value
+            rows.append(model(**kwargs))
+
+        session = self._session_factory()
+        try:
+            session.add_all(rows)
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+            self._logger.warning(f"Duplicate rows skipped in {table_name}")
+        finally:
+            session.close()
 
     def execute(self, query: str):
         with self._engine.begin() as conn:
