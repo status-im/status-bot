@@ -1,4 +1,3 @@
-from pandas.core.arrays import boolean
 from sqlalchemy import BigInteger, Boolean, Column, DateTime, Integer, String
 
 from .base import Base
@@ -27,7 +26,7 @@ class ReceivedChat(Base):
     membership_update_events = Column(Integer, nullable=True)
     identicon = Column(String, nullable=True)
     muted = Column(String, nullable=True)
-    mute_till = Column(boolean, nullable=True)
+    mute_till = Column(Boolean, nullable=True)
     community_id = Column(String, nullable=True)
     category_id = Column(String, nullable=True)
     joined = Column(String, nullable=True)

@@ -1,12 +1,9 @@
 database:
-  type: postgres
-  host: "database"
-  port: 5432
-  schema: "status_app_monitoring"
-  name: "status-bot"
-  tables:
-    messages: "raw_messages"
-    community: "raw_community_info"
+    type: postgres
+    host: "localhost"
+    port: 5432
+    schema: "status_app_monitoring"
+    name: "status-bot"
 # Value must be in MINUTES
 sleep: 10
 
@@ -16,36 +13,38 @@ sleep: 10
 #   uvicorn_access: false   # true to enable FastAPI per-request access logs
 
 files:
-  # Get the latest community chat dates for next run
-  current_state: "dates.pkl"
+    # Get the latest community chat dates for next run
+    current_state: "dates.pkl"
 
 bot:
-  init_account: true
-  display_name: 'e-raccoon'
-  public_key: "0xExample"
-  #compressed_key: "example-compressed-key"
-  bot_hash_pepper: '' #Use a large random value
+    name: 'status-bot'
+    chat_key: "zQ3..Example"
+    bot_hash_pepper: '' # Use a large random value
 
 backend:
-  domain: "status-backend"
-  backend_port: 8080
-  is_secure: false
+    domain: "localhost"
+    backend_port: 8080
+    is_secure: false
 
 api:
-  enable: true
-  host: "0.0.0.0"
-  port: 8081
-  # api_key: "your-secret-key"
+    enable: true
+    host: "0.0.0.0"
+    port: 8081
+    # api_key: "your-secret-key"
 
 modules:
-  directories: []
-  enabled: ["messaging", "receiver"]
-  settings:
-    receiver:
-      messages_table: "received_messages"
-      chats_table: "received_chats"
-
+    directories: []
+    enabled: ["messaging", "receiver", "monitoring"]
+    settings:
+        receiver:
+            messages_table: "received_messages"
+            chats_table: "received_chats"
+        monitoring:
+            detoxify: true
+            tables:
+                messages: "raw_messages"
+                community: "raw_community_info"
 prometheus:
-  enabled: true
-  host: "0.0.0.0"
-  port: 8000
+    enabled: true
+    host: "0.0.0.0"
+    port: 8000

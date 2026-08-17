@@ -15,49 +15,28 @@ logger = logging.getLogger("status_bot.main")
 
 
 def create_bot(config: Config, project_root: str) -> Account:
-    account = Account(**config.backend.model_dump())
-    available_accounts = [a["name"] for a in account.available_accounts]
+    account = Account(
+        **config.backend.model_dump(),
+        volume_folder=os.path.dirname(__file__)
+    )
+    account.login(
+        config.bot.password,
+        name=config.bot.name,
+        mnemonic=config.bot.mnemonic_phrase,
+        infura_token=config.bot.infura_token,
+        alchemy_token=config.bot.alchemy_token,
+        coingecko_api_key=config.bot.coingecko_api_key
+    )
 
-    name = config.bot.name
-    password = config.bot.password
-
-    if name in available_accounts:
-        logger.info(f"Logging in with display name: {name}")
-        account.login(
-            name=name,
-            password=password,
-            infura_token=config.bot.infura_token,
-            coingecko_api_key=config.bot.coingecko_api_key
-        )
-    elif config.bot.init_account:
-        mnemonic = config.bot.mnemonic_phrase
-        if not mnemonic:
-            raise ValueError(
-                "init_account is true but no mnemonic_phrase provided"
-            )
-        logger.info(f"Creating/restoring account: {name}")
-        account.login(
-            name=name,
-            password=password,
-            mnemonic=mnemonic,
-            infura_token=config.bot.infura_token,
-            coingecko_api_key=config.bot.coingecko_api_key
-        )
-    else:
-        raise ValueError(
-            f"Account '{name}' not found and init_account is false. "
-            f"Available accounts: {[a['display_name'] for a in available_accounts]}"
-        )
-
-    if account.info["compressed_key"] != config.bot.compressed_key:
+    if account.info["compressed_key"] != config.bot.chat_key:
         raise Exception(
             "Target compressed key and logged in compressed key are different."
         )
 
-    profile_path = os.path.join(project_root, "assets", "profile.jpg")
-    account.profile_picture = profile_path
-    logger.info(
-        f"Account Information: {account.info['display_name']}\n"
+    # profile_path = os.path.join(project_root, "assets", "profile.jpg")
+    # account.profile_picture = profile_path
+    account.logger.info(
+        f"\n\tAccount Information: {account.info['display_name']}\n"
         f"\tCompressed Key: {account.info['compressed_key']}\n"
         f"\tPublic Key: {account.info['public_key']}\n"
         f"\tURL: {account.info['url']}"
@@ -85,7 +64,7 @@ def main():
     )
     parser.add_argument(
         "--config",
-        default="./config.yaml",
+        default=os.path.join(os.path.dirname(__file__), "config.yaml"),
         help="Path to configuration file (default: ./config.yaml)",
     )
     args = parser.parse_args()
@@ -102,7 +81,6 @@ def main():
         sys.exit(1)
 
     logger.info("Status Bot starting...")
-
     project_root = os.path.dirname(os.path.abspath(__file__))
 
     try:

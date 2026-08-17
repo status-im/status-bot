@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from status_bot.modules.base import BaseModule, ModuleType
 
+import os
 
 class AddContactRequest(BaseModel):
     public_key: str
@@ -25,11 +26,11 @@ class MessagingModule(BaseModule):
         return ModuleType.SERVICE
 
     def on_start(self):
-        app: FastAPI = self.ctx.shared_state["fastapi_app"]
+        app: FastAPI = self.context.shared_state["fastapi_app"]
         self._setup_routes(app)
 
     def _setup_routes(self, app: FastAPI):
-        account = self.ctx.account
+        account = self.context.account
 
         @app.get("/health")
         def health():
@@ -66,45 +67,28 @@ class MessagingModule(BaseModule):
             start_timestamp: Optional[str] = None,
             end_timestamp: Optional[str] = None,
         ):
-            start = None
-            end = None
-            if start_timestamp:
-                try:
-                    start = datetime.fromisoformat(start_timestamp)
-                except ValueError:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Invalid start_timestamp, use ISO format",
-                    )
-            if end_timestamp:
-                try:
-                    end = datetime.fromisoformat(end_timestamp)
-                except ValueError:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Invalid end_timestamp, use ISO format",
-                    )
-            return account.get_messages(chat_id, start, end)
+            try:
+                return account.get_messages(chat_id, start_timestamp, end_timestamp)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=str(e))
 
         @app.post("/api/v1/chats/{chat_id}/messages", status_code=201)
         def send_message(chat_id: str, payload: SendMessageRequest):
             if not payload.text:
                 raise HTTPException(status_code=400, detail="Message text is required")
-            account.send_message(chat_id, payload.text)
-            return {"status": "ok"}
+            msg_id = account.send_message(chat_id, payload.text)
+            return {"status": "ok", "id": msg_id}
 
         @app.get("/api/v1/communities")
         def get_communities():
             return account.communities
 
-        @app.post("/api/v1/communities/request", status_code=201)
-        def send_request_community(payload: SendRequestCommunityRequest):
-            if not payload.url:
-                raise HTTPException(status_code=400, detail="Community url is required")
-            request_time = account.send_request_community(payload.url)
-            if not request_time:
-                raise HTTPException(status_code=400, detail="Error when trying to send the community request")
-            return {"status": "request send", "request_time": request_time}
+        @app.post("/api/v1/backup", status_code=201)
+        def backup():
+            file_path = account.backup()
+            st = os.stat(file_path)
+            created = datetime.fromtimestamp(st.st_ctime)
+            return {"status": "ok", "created_timestamp": created, "file_path": file_path}
 
     def execute(self):
-        self.ctx.stop_event.wait()
+        self.context.stop_event.wait()

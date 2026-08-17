@@ -3,6 +3,7 @@ import logging
 
 import pandas as pd
 
+from status_bot import Config
 from status_bot.modules.base import BaseModule, ModuleType
 from status_bot.modules.utils import camel_to_snake, generate_salt, to_hmac_sha256_hash
 from status_bot.constants import _MESSAGE_DETERMINISTIC_COLUMNS, _MESSAGE_DROP_COLUMNS,_MESSAGE_SALTED_COLUMNS, _CHAT_SALTED_COLUMNS, _CHAT_DETERMINISTIC_COLUMNS, _SALT_COLUMN
@@ -61,15 +62,15 @@ class ReceiverModule(BaseModule):
         return ModuleType.EVENT
 
     def on_start(self):
-        settings = self.ctx.config.settings
+        settings = self.context.config.settings
         self._messages_table = settings.get("messages_table", "received_messages")
         self._chats_table = settings.get("chats_table", "received_chats")
 
-        config = self.ctx.shared_state.get("config")
+        config: Config = self.context.shared_state.get("config")
         self._pepper = config.bot.bot_hash_pepper if config else ""
 
-        if self.ctx.db is None:
-            logger.warning("Receiver: no database configured, disabling")
+        if self.context.db is None:
+            self.context.logger.warning("Receiver: no database configured, disabling")
             self._disabled = True
             return
 
@@ -84,7 +85,7 @@ class ReceiverModule(BaseModule):
 
         event_data = event.get("event", {})
 
-        messages = event_data.get("messages", [])
+        messages: list[dict] = event_data.get("messages", [])
         if messages:
             logger.info(f"Received {len(messages)} message(s)")
             self._process_and_insert(
@@ -127,7 +128,5 @@ class ReceiverModule(BaseModule):
 
         df["received_timestamp"] = datetime.datetime.now()
 
-        self.ctx.db.insert(df, table_name, [])
-        logger.info(
-            f"Receiver: stored {len(df)} record(s) in {table_name}"
-        )
+        self.context.db.insert(df, table_name, [])
+        self.context.logger.info(f"Receiver: stored {len(df)} record(s) in {table_name}")

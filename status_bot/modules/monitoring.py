@@ -1,18 +1,22 @@
-import datetime
-import os
-import logging
+import datetime, os, logging
 from pathlib import Path
 
 import pandas as pd
-
+from status_sdk import Account, Community
 from status_bot.modules.base import BaseModule, ModuleType
-from status_bot.modules.utils import save_file, to_midnight, to_sha256_hash
+from status_bot.modules.utils import save_file, to_midnight, to_sha256_hash, remove_public_key
+from status_bot import Config
+from typing import Optional
 
-logger = logging.getLogger(__name__)
+try:
+    from detoxify import Detoxify
+    import torch
+except:
+    pass
 
-
-def extract_community_channels(account, community: dict, latest_dates: dict[str, pd.Timestamp]) -> pd.DataFrame:
+def extract_community_channels(account: Account, community: Community, latest_dates: dict[str, pd.Timestamp], model: Optional[Detoxify] = None) -> pd.DataFrame:
     bridge_key = "bridge_message"
+    logger = account.logger
     columns = {
         "id": True,
         "whisper_timestamp": False,
@@ -27,19 +31,25 @@ def extract_community_channels(account, community: dict, latest_dates: dict[str,
         "extracted_timestamp": False,
     }
 
+    if model:
+        columns.update({
+            key: False
+            for key in model.predict("test").keys()
+        })
+
     final = []
-    for channel in community["channels"]:
+    for channel_info in community.channels:
         now = datetime.datetime.now()
-        start_timestamp = latest_dates.get(channel["chat_id"])
+        channel = community[channel_info["name"]]
+
+        start_timestamp = latest_dates.get(channel.id)
         if start_timestamp:
             start_timestamp += datetime.timedelta(seconds=1)
         else:
             start_timestamp = to_midnight(now - datetime.timedelta(days=30))
 
-        logger.info(
-            f"Starting message extraction for # {channel['name']} [{start_timestamp} - {now}]"
-        )
-        messages = account.get_messages(channel["chat_id"], start_timestamp, now)
+        account.logger.info(f"Starting message extraction for # {channel.name} [{start_timestamp} - {now}]")
+        messages = channel.get_messages(start_timestamp, now)
         messages = pd.DataFrame(messages)
         if len(messages) == 0:
             logger.info("No messages found")
@@ -47,7 +57,7 @@ def extract_community_channels(account, community: dict, latest_dates: dict[str,
 
         logger.info(f"Extracted {len(messages)} message(s)")
         messages = messages.assign(
-            community_id=community["id"],
+            community_id=community.id,
             extracted_timestamp=now,
         )
         final.append(messages)
@@ -55,6 +65,14 @@ def extract_community_channels(account, community: dict, latest_dates: dict[str,
     extracted_data = pd.concat(final, ignore_index=True) if final else pd.DataFrame()
     if len(extracted_data) == 0:
         return extracted_data
+
+    if model:
+        extracted_data = extracted_data.merge(
+            extracted_data["text"].apply(lambda text: pd.Series(model.predict(remove_public_key(text)))),
+            "left",
+            left_index=True,
+            right_index=True
+        )
 
     existing_columns = extracted_data.columns.to_list()
     for column, should_hash in columns.items():
@@ -68,7 +86,7 @@ def extract_community_channels(account, community: dict, latest_dates: dict[str,
 
     if bridge_key in extracted_data.columns:
         extracted_data["source"] = extracted_data[bridge_key].apply(
-            lambda value: value["bridgeName"] if not pd.isna(value) else "status"
+            lambda value: value.get("bridgeName", "status") if not pd.isna(value) else "status"
         )
     else:
         extracted_data["source"] = "status"
@@ -89,7 +107,9 @@ class MonitoringModule(BaseModule):
         return ModuleType.PERIODIC
 
     def on_start(self) -> None:
-        account = self.ctx.account
+        account = self.context.account
+        logger = account.logger
+
         balance = account["GBP"]
         query = (
             (balance["symbol"] == "SNT")
@@ -99,67 +119,85 @@ class MonitoringModule(BaseModule):
         if query.sum() != 1:
             raise RuntimeError("Wallet balance check failed — Infura or Coingecko issue")
 
-    def execute(self) -> None:
-        config = self.ctx.shared_state.get("config")
-        if config is None:
-            logger.error("MonitoringModule: config not found in shared_state")
+        logger.info(self.context.config.settings)
+
+        settings = self.context.config.settings
+        if not settings.get("detoxify", False):
+            self._model = None
             return
 
-        project_root = self.ctx.shared_state.get("project_root")
+        try:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            self._model = Detoxify("original", device=device)
+            logger.info(f"Initialized Detoxify on {device}")
+        except:
+            self._model = None
+            logger.info("Skipping toxic comment classification. PyPi library `detoxify` not found...")
+
+
+    def execute(self):
+        config: Config = self.context.shared_state.get("config")
+        if config is None:
+            self.context.logger.error("MonitoringModule: config not found in shared_state")
+            return
+
+        project_root = self.context.shared_state.get("project_root")
         if not project_root:
             project_root = os.path.dirname(os.path.abspath(__file__))
 
-        account = self.ctx.account
+        account = self.context.account
+        logger = account.logger
 
-        upload_folder = self.ctx.config.settings.get("upload_folder", "uploads")
+        upload_folder = self.context.config.settings.get("upload_folder", "uploads")
         upload_path = os.path.join(project_root, upload_folder)
         current_state_path = os.path.join(project_root, config.files.current_state)
 
-        self._download(account, upload_path, current_state_path, config)
+        self._download(account, upload_path, current_state_path)
 
-        if self.ctx.db is not None:
-            self._store(upload_path, current_state_path, config)
+        if self.context.db is not None:
+            self._store(upload_path, current_state_path, config, logger)
         else:
             logger.info("No database configured, skipping store step")
 
-    def _download(self, account, upload_path: str, current_state_path: str, config) -> None:
+    def _download(self, account: Account, upload_path: str, current_state_path: str):
         latest_dates: dict[str, pd.Timestamp] = (
             pd.read_pickle(current_state_path) if os.path.exists(current_state_path) else {}
         )
-
+        logger = account.logger
         get_file_name = lambda: str(to_midnight(datetime.datetime.now()).timestamp()).replace(".", "")
         communities = account.communities
         if not communities:
             logger.warning("No communities found...")
             return
 
-        for community in communities:
-            if not community["is_member"]:
+        for community_info in communities:
+
+            community = Community(account, community_info["id"])
+            if not community.is_member:
                 continue
 
-            community_folder_name = community["name"].replace(" ", "-")
+            community_name = community.name
+            community_folder_name = community_name.replace(" ", "-")
             messages_folder = os.path.join(upload_path, "messages", community_folder_name)
             community_info_folder = os.path.join(upload_path, "community", community_folder_name)
 
-            logger.info(f"Extracting data for {community['name']}")
-            community["extracted_timestamp"] = datetime.datetime.now()
+            account.logger.info(f"Extracting data for {community_name}")
 
             file_path = os.path.join(community_info_folder, get_file_name() + ".pkl")
             if not os.path.exists(file_path):
-                save_file(file_path, community)
-                logger.info(f"Created {file_path}")
+                save_file(file_path, community_info)
+                account.logger.info(f"Created {file_path}")
 
             file_path = os.path.join(messages_folder, get_file_name() + ".csv")
             if not os.path.exists(file_path):
-                messages = extract_community_channels(account, community, latest_dates)
+                messages = extract_community_channels(account, community, latest_dates, self._model)
                 if len(messages) > 0:
                     save_file(file_path, messages)
                     logger.info(f"Created {file_path}")
 
-    def _store(self, upload_path: str, current_state_path: str, config) -> None:
+    def _store(self, upload_path: str, current_state_path: str, config: Config, logger: logging.Logger):
         path = Path(upload_path)
-        table_name_mapping: dict[str, str] = config.database.tables
-
+        table_name_mapping: dict[str, str] = config.modules.settings.get("monitoring", {}).get("tables", {})
         upload: dict[str, list] = {}
         latest_dates: dict[str, pd.Timestamp] = (
             pd.read_pickle(current_state_path) if os.path.exists(current_state_path) else {}
@@ -195,7 +233,7 @@ class MonitoringModule(BaseModule):
         save_file(current_state_path, latest_dates)
         logger.info(f"Updated {current_state_path}")
 
-        connector = self.ctx.db
+        connector = self.context.db
         for table_name, data in upload.items():
             if len(data) == 0:
                 continue

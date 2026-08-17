@@ -1,13 +1,12 @@
 # Configuration
 
-The bot is configured through a YAML file (`config.yaml`) and environment variables.
-Environment variables override values from the YAML file.
+The bot is configured through a YAML file (`config.yaml`) and environment variables. Environment variables override values from the YAML file.
 
 ## Loading order
 
-1. `config.yaml` — base configuration
-2. Shell environment variables — override YAML values
-3. `.env` file — override YAML values (loaded from the same directory as `config.yaml`)
+1. `config.yaml` - base configuration
+2. Shell environment variables - override YAML values
+3. `.env` file - override YAML values (loaded from the same directory as `config.yaml`)
 
 ## Usage
 
@@ -65,24 +64,21 @@ files:
 
 | Field | Type | Default | Env var | Description |
 |-------|------|---------|---------|-------------|
-| `display_name` | `str` | `""` | `BOT_DISPLAY_NAME` | Status display name used to log in |
-| `public_key` | `str` | `""` | — | Expected public key for verification |
-| `password` | `str` | `""` | `BOT_PASSWORD` | Status account password |
-| `mnemonic_phrase` | `str` | `""` | `BOT_MNEMONIC_PHRASE` | 12-word recovery phrase (used when `init_account: true`) |
-| `init_account` | `bool` | `false` | `BOT_INIT_ACCOUNT` | If `false`, the account must already exist. If `true`, creates or restores the account using `mnemonic_phrase` |
-| `compressed_key` | `str` | `""` | — | Expected compressed key for verification after login |
-| `infura_token` | `str` | `""` | `BOT_INFURA_TOKEN` | [Infura token](https://www.infura.io/) required for token-gated communities |
-| `coingecko_api_key` | `str` | `""` | `BOT_COINGECKO_API_KEY` | [CoinGecko API key](https://www.coingecko.com/) required for token-gated communities |
-| `bot_hash_pepper` | `str` | `""` | `BOT__BOT_HASH_PEPPER` | Secret key used for HMAC-SHA256 hashing of stored messages (see [Privacy & storage](#privacy--storage)) |
-
+| `name` | `str` |  |  | The display name of the Status account. |
+| `chat_key` | `str` |  |  | [Status App chat key](https://github.com/status-im/status-python-sdk/blob/master/docs/account.md#public-keys) |
+| `password` | `str` |  | `BOT__PASSWORD` | Status account password |
+| `mnemonic_phrase` | `str` |  | `BOT__MNEMONIC_PHRASE` | 12 / 18 / 24 word recovery phrase |
+| `infura_token` | `str` |  | `BOT__INFURA_TOKEN` | [Infura token](https://www.infura.io/) required for token-gated communities |
+| `coingecko_api_key` | `str` |  | `BOT_COINGECKO_API_KEY` | [CoinGecko API key](https://www.coingecko.com/) required for token-gated communities |
+| `alchemy_token` | `str` |  | `BOT__ALCHEMY_TOKEN` | [Alchemy API key](https://www.alchemy.com/) required for token-gated communities |
+| `bot_hash_pepper` | `str` |  | `BOT__BOT_HASH_PEPPER` | Secret key used for HMAC-SHA256 hashing of stored messages (see [Privacy & storage](#privacy--storage)) |
 
 ```yaml
 bot:
-    display_name: 'my-bot'
+    name: 'my-bot'
     public_key: '0x...'
     password: 'ChangeMe'
     mnemonic_phrase: 'word1 word2 ... word12'
-    init_account: false
     compressed_key: 'zQ3...'
 ```
 
@@ -92,9 +88,9 @@ Parameter to connect to the Status Backend instance.
 
 | Field | Type | Default | Env var | Description |
 |-------|------|---------|---------|-------------|
-| `domain` | `str` | `"localhost"` | `BOT_PARAMS_DOMAIN` | Status Backend hostname (`localhost` for local, `status-backend` for Docker) |
-| `port` | `int` | `8080` | `BOT_PARAMS_PORT` | Status Backend API port |
-| `is_secure` | `bool` | `false` | `BOT_PARAMS_IS_SECURE` | Use HTTPS instead of HTTP |
+| `domain` | `str` | `localhost` |  | Status Backend hostname (`localhost` for local, `status-backend` for Docker) |
+| `port` | `int` | `8080` |  | Status Backend API port |
+| `is_secure` | `bool` | `false` |  | Use HTTPS instead of HTTP |
 ```yaml
 backend:
     domain: "status-backend"
@@ -110,10 +106,10 @@ Configuration for the WebServer avaialable to the modules.
 
 | Field | Type | Default | Env var | Description |
 |-------|------|---------|---------|-------------|
-| `enable` | `bool` | `true` | `API_ENABLE` | Enable the REST API server |
-| `host` | `str` | `"0.0.0.0"` | `API_HOST` | API server bind address |
-| `port` | `int` | `8081` | `API_PORT` | API server port |
-| `api_key` | `str` | `""` | `API_API_KEY` | API key for request authentication (empty = disabled) |
+| `enable` | `bool` | `true` | `API__ENABLE` | Enable the REST API server |
+| `host` | `str` | `0.0.0.0` | `API__HOST` | API server bind address |
+| `port` | `int` | `8081` | `API__PORT` | API server port |
+| `api_key` | `str` | `""` | `API__API_KEY` | API key for request authentication (empty = disabled) |
 
 ```yaml
 api:
@@ -131,28 +127,22 @@ Supports **Postgres** and **SQLite** (SQLite via `type: sqlite`, where `name` is
 
 | Field | Type | Default | Env var | Description |
 |-------|------|---------|---------|-------------|
-| `type` | `str` | `"postgres"` | `DATABASE_TYPE` | Database engine (`postgres` or `sqlite`) |
-| `host` | `str` | `"database"` | `DATABASE_HOST` | Database server hostname (Postgres) |
-| `port` | `int` | `5432` | `DATABASE_PORT` | Database server port (Postgres) |
-| `user` | `str` | `""` | `DATABASE_USER` | Database username (Postgres) |
-| `password` | `str` | `""` | `DATABASE_PASSWORD` | Database password (Postgres) |
-| `name` | `str` | `""` | `DATABASE_NAME` | Database name (Postgres) or file path (SQLite) |
-| `schema` | `str` | `"public"` | `DATABASE_SCHEMA` | Database schema (Postgres) |
-| `tables` | `dict` | `{}` | — | Mapping of data type to table name |
+| `type` | `str` | `postgres` | `DATABASE__TYPE` | Database engine (`postgres` or `sqlite`) |
+| `host` | `str` | `localhost` | `DATABASE__HOST` | Database server hostname (Postgres) |
+| `port` | `int` | `5432` | `DATABASE__PORT` | Database server port (Postgres) |
+| `name` | `str` | `status-bot` | `DATABASE_NAME` | Database name (Postgres) or file path (SQLite) |
+| `user` | `str` |  | `DATABASE__USER` | Database username (Postgres) |
+| `password` | `str` |  | `DATABASE__PASSWORD` | Database password (Postgres) |
 
 Postgres example:
 ```yaml
 database:
     type: postgres
-    host: database
+    host: localhost
     port: 5432
     user: 'myuser'
     password: 'ChangeMe'
     name: 'status-bot'
-    schema: "status_app_monitoring"
-    tables:
-        messages: "raw_messages"
-        community: "raw_community_info"
 ```
 
 SQLite example:
@@ -170,7 +160,7 @@ The `receiver` module hashes identifying and content-bearing fields before persi
 
 | Field | Env var | Description |
 |-------|---------|-------------|
-| `bot.bot_hash_pepper` | `BOT__BOT_HASH_PEPPER` | Secret key used for HMAC-SHA256 hashing. Must be stable across restarts (changing it breaks dedup and changes all stored hashes). If unset, the bot logs a warning and falls back to plain SHA-256 — content is then not protected against dictionary attacks |
+| `bot.bot_hash_pepper` | `BOT__BOT_HASH_PEPPER` | Secret key used for HMAC-SHA256 hashing. Must be stable across restarts (changing it breaks dedup and changes all stored hashes). If unset, the bot logs a warning and falls back to plain SHA-256 - content is then not protected against dictionary attacks |
 
 **Hashing scheme:**
 
@@ -202,7 +192,7 @@ Event payloads are kept in plaintext in-memory so they can be handled correctly;
 | `enabled` | `list[str]` | `[]` | List of module names to enable |
 | `settings` | `dict` | `{}` | Per-module settings (each module defines its own schema) |
 
-The `api_server` module is auto-loaded whenever `api.enable` is `true` — it does not need to be listed in `enabled`.
+The `api_server` module is auto-loaded whenever `api.enable` is `true` - it does not need to be listed in `enabled`.
 
 ```yaml
 modules:

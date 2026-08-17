@@ -27,10 +27,10 @@ class APIServerModule(BaseModule):
         return ModuleType.SERVICE
 
     def on_start(self):
-        api_config = self.ctx.shared_state["config"].api
+        api_config = self.context.shared_state["config"].api
         self._host = api_config.host
         self._port = api_config.port
-        self._app: FastAPI = self.ctx.shared_state["fastapi_app"]
+        self._app: FastAPI = self.context.shared_state["fastapi_app"]
         self._server = None
         self._add_auth_middleware(api_config.api_key)
 
@@ -52,7 +52,7 @@ class APIServerModule(BaseModule):
             return await call_next(request)
 
     def execute(self):
-        if not self.ctx.shared_state["config"].api.enable:
+        if not self.context.shared_state["config"].api.enable:
             logger.info("API server is disabled, skipping startup")
             return
 
@@ -67,7 +67,7 @@ class APIServerModule(BaseModule):
         self._server = server
         thread = threading.Thread(target=server.run, daemon=True)
         thread.start()
-        self.ctx.stop_event.wait()
+        self.context.stop_event.wait()
         server.should_exit = True
         thread.join(timeout=10)
 

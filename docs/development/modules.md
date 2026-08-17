@@ -40,7 +40,7 @@ class MyModule(BaseModule):
 
 ### ModuleContext
 
-Every module receives a `ModuleContext` via the constructor, accessible as `self.ctx`:
+Every module receives a `ModuleContext` via the constructor, accessible as `self.context`:
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -56,10 +56,10 @@ Every module receives a `ModuleContext` via the constructor, accessible as `self
 Each module receives only its own settings from `config.yaml`:
 
 ```python
-self.ctx.config.name        # module identifier
-self.ctx.config.interval    # seconds between PERIODIC runs
-self.ctx.config.max_retries # restart attempts before permanent failure
-self.ctx.config.settings    # dict of module-specific settings
+self.context.config.name        # module identifier
+self.context.config.interval    # seconds between PERIODIC runs
+self.context.config.max_retries # restart attempts before permanent failure
+self.context.config.settings    # dict of module-specific settings
 ```
 
 ---
@@ -78,7 +78,7 @@ class MyAPIModule(BaseModule):
         return ModuleType.SERVICE
 
     def on_start(self):
-        app = self.ctx.shared_state["fastapi_app"]
+        app = self.context.shared_state["fastapi_app"]
         self._setup_routes(app)
 
     def _setup_routes(self, app):
@@ -87,7 +87,7 @@ class MyAPIModule(BaseModule):
             return {"hello": "world"}
 
     def execute(self):
-        self.ctx.stop_event.wait()  # block until shutdown
+        self.context.stop_event.wait()  # block until shutdown
 ```
 
 The `api_server` module is auto-loaded whenever any API module is enabled and `api.enable` is `true`.
@@ -106,12 +106,12 @@ class AutoReplyModule(BaseModule):
         return ModuleType.EVENT
 
     def on_start(self):
-        self._commands = self.ctx.config.settings.get("commands", {})
+        self._commands = self.context.config.settings.get("commands", {})
 
     def on_event(self, event: dict):
         messages = event.get("event", {}).get("messages", [])
         for msg in messages:
-            self.ctx.account.send_message(msg["chatId"], "Message received")
+            self.context.account.send_message(msg["chatId"], "Message received")
 ```
 
 The signal listener respects `stop_event` for graceful shutdown.
@@ -148,7 +148,7 @@ Any unexpected column containing structured data (dict/list) is dropped with a l
 ## Best practices
 
 - **Error isolation**: One module crash never affects others. The `ModuleManager` restarts failed modules with exponential backoff.
-- **Graceful shutdown**: Always check `self.ctx.stop_event.is_set()` or use `self.ctx.stop_event.wait()` in long-running loops.
+- **Graceful shutdown**: Always check `self.context.stop_event.is_set()` or use `self.context.stop_event.wait()` in long-running loops.
 - **No blocking in EVENT modules**: EVENT handlers process one event at a time — keep `on_event()` fast.
 - **Thread safety**: Modules run in separate threads. Use `shared_state` with caution for shared mutable data.
-- **Configuration**: Read module-specific settings from `self.ctx.config.settings` — each module gets its own config namespace.
+- **Configuration**: Read module-specific settings from `self.context.config.settings` — each module gets its own config namespace.

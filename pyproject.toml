@@ -22,6 +22,10 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest"]
 
+monitoring = [
+    "detoxify"
+]
+
 [project.scripts]
 status-bot = "main:main"
 

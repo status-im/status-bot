@@ -1,8 +1,15 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 from dataclasses import dataclass, field
 from enum import Enum
+from status_sdk import Account
 import threading
+import logging
+
+if TYPE_CHECKING:
+    from status_bot import Database
 
 
 class ModuleType(Enum):
@@ -27,22 +34,23 @@ class ModuleConfig:
 
 @dataclass
 class ModuleContext:
-    account: Any
+    account: Account
     config: ModuleConfig
-    db: Optional[Any] = None
+    logger: logging.Logger
+    db: Optional[Database] = None
     shared_state: dict = field(default_factory=dict)
     stop_event: Optional[threading.Event] = None
 
 
 class BaseModule(ABC):
 
-    def __init__(self, ctx: ModuleContext):
-        self._ctx = ctx
+    def __init__(self, context: ModuleContext):
+        self._context = context
         self._running = False
 
     @property
-    def ctx(self) -> ModuleContext:
-        return self._ctx
+    def context(self) -> ModuleContext:
+        return self._context
 
     @property
     @abstractmethod
@@ -51,7 +59,7 @@ class BaseModule(ABC):
 
     @property
     def name(self) -> str:
-        return self._ctx.config.name
+        return self._context.config.name
 
     @abstractmethod
     def execute(self) -> Any:

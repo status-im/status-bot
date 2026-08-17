@@ -1,19 +1,24 @@
+from __future__ import annotations
+
 import os
 import importlib.util
 import threading
 import logging
-from typing import Optional, Type
+from typing import Type, TYPE_CHECKING
 from pathlib import Path
-
+from status_sdk import Account
 from .base import BaseModule, ModuleConfig, ModuleContext, ModuleType
 from status_bot.config import ModulesConfig
+
+if TYPE_CHECKING:
+    from status_bot import Database
 
 logger = logging.getLogger(__name__)
 
 
 class ModuleManager:
 
-    def __init__(self, modules_config: ModulesConfig, account, db, shared_state: dict = None):
+    def __init__(self, modules_config: ModulesConfig, account: Account, db: Database, shared_state: dict = None):
         self._modules_config = modules_config
         self._account = account
         self._db = db
@@ -115,6 +120,7 @@ class ModuleManager:
 
             ctx = ModuleContext(
                 account=self._account,
+                logger=self._account.logger,
                 config=module_config,
                 db=self._db,
                 shared_state=self._shared_state,
@@ -152,8 +158,8 @@ class ModuleManager:
 
     def _run_module_wrapper(self, module: BaseModule) -> None:
         retries = 0
-        max_retries = module.ctx.config.max_retries
-        backoff = module.ctx.config.backoff_seconds
+        max_retries = module.context.config.max_retries
+        backoff = module.context.config.backoff_seconds
 
         while retries <= max_retries and not self._stop_event.is_set():
             try:
@@ -191,7 +197,7 @@ class ModuleManager:
                     pass
 
     def _run_periodic(self, module: BaseModule) -> None:
-        interval = module.ctx.config.interval
+        interval = module.context.config.interval
         while not self._stop_event.is_set():
             module.execute()
             self._stop_event.wait(interval)

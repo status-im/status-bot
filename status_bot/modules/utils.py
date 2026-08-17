@@ -2,6 +2,7 @@ import datetime
 import hmac
 import logging
 import os
+import re
 import pickle
 import re
 from hashlib import sha256
@@ -22,6 +23,14 @@ def camel_to_snake(name: str) -> str:
 
 def to_sha256_hash(value: str) -> str:
     return sha256(value.encode()).hexdigest()
+
+
+def remove_public_key(text: str) -> str:
+    """
+    Remove any `@public-key` patterns from text message
+    """
+    pattern = re.compile(r"(?<![\w.])@0x[0-9a-fA-F]{130}")
+    return pattern.sub("@anon", text)
 
 
 def to_hmac_sha256_hash(value: str, pepper: str = "", salt: str = "") -> str:
