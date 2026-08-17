@@ -4,41 +4,10 @@ import logging
 import pandas as pd
 
 from status_bot.modules.base import BaseModule, ModuleType
-from status_bot.modules.utils import generate_salt, to_hmac_sha256_hash
+from status_bot.modules.utils import camel_to_snake, generate_salt, to_hmac_sha256_hash
+from status_bot.constants import _MESSAGE_DETERMINISTIC_COLUMNS, _MESSAGE_DROP_COLUMNS,_MESSAGE_SALTED_COLUMNS, _CHAT_SALTED_COLUMNS, _CHAT_DETERMINISTIC_COLUMNS, _SALT_COLUMN
 
 logger = logging.getLogger("status_bot.receiver")
-
-_MESSAGE_DETERMINISTIC_COLUMNS = [
-    "id",
-    "from",
-    "response_to",
-    "chat_id",
-    "local_chat_id",
-]
-
-_MESSAGE_SALTED_COLUMNS = [
-    "display_name",
-    "ens_name",
-    "alias",
-    "text",
-]
-
-_MESSAGE_DROP_COLUMNS = [
-    "parsed_text",
-    "quoted_message",
-    "emoji_hash",
-    "gap_parameters",
-]
-
-_CHAT_DETERMINISTIC_COLUMNS = [
-    "id",
-]
-
-_CHAT_SALTED_COLUMNS = [
-    "name",
-]
-
-_SALT_COLUMN = "salt"
 
 
 def transform_dataframe(
@@ -49,7 +18,7 @@ def transform_dataframe(
     pepper: str = "",
 ) -> pd.DataFrame:
     df = df.copy()
-    df.columns = [col.lower() for col in df.columns]
+    df.columns = [camel_to_snake(col) for col in df.columns]
 
     for col in drop_columns:
         if col in df.columns:

@@ -3,6 +3,7 @@ import hmac
 import logging
 import os
 import pickle
+import re
 from hashlib import sha256
 
 import pandas as pd
@@ -11,6 +12,12 @@ from typing import Any
 logger = logging.getLogger("status_bot.utils")
 
 _PEPPER_WARNED = False
+
+
+def camel_to_snake(name: str) -> str:
+    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
+    s2 = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
+    return s2.lower()
 
 
 def to_sha256_hash(value: str) -> str:
