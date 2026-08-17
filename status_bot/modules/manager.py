@@ -8,14 +8,15 @@ from pathlib import Path
 from .base import BaseModule, ModuleConfig, ModuleContext, ModuleType
 from status_bot.config import ModulesConfig
 
+logger = logging.getLogger(__name__)
+
 
 class ModuleManager:
 
-    def __init__(self, modules_config: ModulesConfig, account, db, logger: logging.Logger, shared_state: dict = None):
+    def __init__(self, modules_config: ModulesConfig, account, db, shared_state: dict = None):
         self._modules_config = modules_config
         self._account = account
         self._db = db
-        self._logger = logger
         self._modules: dict[str, BaseModule] = {}
         self._module_classes: dict[str, Type[BaseModule]] = {}
         self._threads: dict[str, threading.Thread] = {}
@@ -39,7 +40,7 @@ class ModuleManager:
                 continue
             self._discover_from_directory(directory)
 
-        self._logger.info(
+        logger.info(
             f"Discovered {len(self._module_classes)} module class(es): "
             f"{list(self._module_classes.keys())}"
         )
@@ -47,7 +48,7 @@ class ModuleManager:
     def _discover_from_directory(self, directory: str) -> None:
         base_path = Path(directory)
         if not base_path.exists():
-            self._logger.warning(f"Module directory not found: {directory}")
+            logger.warning(f"Module directory not found: {directory}")
             return
 
         for file_path in sorted(base_path.glob("*.py")):
@@ -82,19 +83,19 @@ class ModuleManager:
                 and attr is not BaseModule
             ):
                 self._module_classes[module_name] = attr
-                self._logger.debug(f"Found module class: {module_name}.{attr_name}")
+                logger.debug(f"Found module class: {module_name}.{attr_name}")
 
     def load_modules(self) -> None:
         enabled = set(self._modules_config.enabled)
         settings = self._modules_config.settings
 
         if not enabled:
-            self._logger.info("No modules enabled in config")
+            logger.info("No modules enabled in config")
             return
 
         for module_name in enabled:
             if module_name not in self._module_classes:
-                self._logger.error(
+                logger.error(
                     f"Module '{module_name}' not found. "
                     f"Available: {list(self._module_classes.keys())}"
                 )
@@ -115,7 +116,6 @@ class ModuleManager:
             ctx = ModuleContext(
                 account=self._account,
                 config=module_config,
-                logger=self._logger,
                 db=self._db,
                 shared_state=self._shared_state,
                 stop_event=self._stop_event,
@@ -124,9 +124,9 @@ class ModuleManager:
             try:
                 module = module_class(ctx)
                 self._modules[module_name] = module
-                self._logger.info(f"Loaded module: {module_name}")
+                logger.info(f"Loaded module: {module_name}")
             except Exception as e:
-                self._logger.error(f"Failed to load module '{module_name}': {e}")
+                logger.error(f"Failed to load module '{module_name}': {e}")
 
     def start_all(self) -> None:
         for name, module in self._modules.items():
@@ -138,17 +138,17 @@ class ModuleManager:
             )
             self._threads[name] = t
             t.start()
-            self._logger.info(f"Started module thread: {name}")
+            logger.info(f"Started module thread: {name}")
 
     def stop_all(self) -> None:
-        self._logger.info("Stopping all modules...")
+        logger.info("Stopping all modules...")
         self._stop_event.set()
         for name, t in self._threads.items():
-            self._logger.debug(f"Waiting for module '{name}' to stop...")
+            logger.debug(f"Waiting for module '{name}' to stop...")
             t.join(timeout=5)
             if t.is_alive():
-                self._logger.warning(f"Module '{name}' did not stop in time")
-        self._logger.info("All modules stopped")
+                logger.warning(f"Module '{name}' did not stop in time")
+        logger.info("All modules stopped")
 
     def _run_module_wrapper(self, module: BaseModule) -> None:
         retries = 0
@@ -171,16 +171,16 @@ class ModuleManager:
 
             except Exception as e:
                 retries += 1
-                self._logger.error(
+                logger.error(
                     f"Module '{module.name}' failed ({retries}/{max_retries}): {e}",
                     exc_info=True,
                 )
                 if retries <= max_retries:
                     wait = backoff * (2 ** (retries - 1))
-                    self._logger.info(f"Restarting '{module.name}' in {wait}s...")
+                    logger.info(f"Restarting '{module.name}' in {wait}s...")
                     self._stop_event.wait(wait)
                 else:
-                    self._logger.error(
+                    logger.error(
                         f"Module '{module.name}' permanently failed after {max_retries} retries"
                     )
             finally:
@@ -203,7 +203,7 @@ class ModuleManager:
             try:
                 module.on_event(event)
             except Exception as e:
-                self._logger.error(
+                logger.error(
                     f"Error in event module '{module.name}': {e}",
                     exc_info=True,
                 )

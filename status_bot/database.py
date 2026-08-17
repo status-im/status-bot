@@ -13,6 +13,8 @@ from .modules.utils import camel_to_snake
 
 TIMESTAMP_DIVISOR = 1_000
 
+logger = logging.getLogger(__name__)
+
 
 class Database:
 
@@ -22,11 +24,10 @@ class Database:
         self._url = self._build_url(db_type, host, port, user, password, name)
         self._engine = create_engine(self._url)
         self._session_factory = sessionmaker(bind=self._engine)
-        self._logger = logging.getLogger("status_bot.database")
 
     def init_tables(self):
         Base.metadata.create_all(self._engine)
-        self._logger.info("Database tables initialized")
+        logger.info("Database tables initialized")
 
     def _build_url(self, db_type: str, host: str, port: int, user: str, password: str, name: str) -> str:
         if db_type == "postgres":
@@ -75,7 +76,7 @@ class Database:
         try:
             data.to_sql(**params)
         except IntegrityError:
-            self._logger.warning(f"Duplicate rows skipped in {table_name}")
+            logger.warning(f"Duplicate rows skipped in {table_name}")
 
     def _insert_with_model(self, data: pd.DataFrame, table_name: str, model):
         data.columns = [camel_to_snake(column) for column in data.columns]
@@ -84,7 +85,7 @@ class Database:
         model_columns = set(table.columns.keys())
         drop_columns = [column for column in data.columns if column not in model_columns]
         if drop_columns:
-            self._logger.warning(
+            logger.warning(
                 f"Dropping non-model column(s) from {table_name}: {drop_columns}"
             )
             data = data.drop(columns=drop_columns)
@@ -121,7 +122,7 @@ class Database:
             session.commit()
         except IntegrityError:
             session.rollback()
-            self._logger.warning(f"Duplicate rows skipped in {table_name}")
+            logger.warning(f"Duplicate rows skipped in {table_name}")
         finally:
             session.close()
 

@@ -2,13 +2,16 @@ import os
 import sys
 import signal
 import argparse
+import logging
 
 from fastapi import FastAPI
 
 from status_sdk import Account
-from status_bot import Config, Database, Logger
+from status_bot import Config, Database, setup_logging
 from status_bot.metrics import start_prometheus
 from status_bot.modules.manager import ModuleManager
+
+logger = logging.getLogger("status_bot.main")
 
 
 def create_bot(config: Config, project_root: str) -> Account:
@@ -19,7 +22,7 @@ def create_bot(config: Config, project_root: str) -> Account:
     password = config.bot.password
 
     if name in available_accounts:
-        account.logger.info(f"Logging in with display name: {name}")
+        logger.info(f"Logging in with display name: {name}")
         account.login(
             name=name,
             password=password,
@@ -32,7 +35,7 @@ def create_bot(config: Config, project_root: str) -> Account:
             raise ValueError(
                 "init_account is true but no mnemonic_phrase provided"
             )
-        account.logger.info(f"Creating/restoring account: {name}")
+        logger.info(f"Creating/restoring account: {name}")
         account.login(
             name=name,
             password=password,
@@ -53,7 +56,7 @@ def create_bot(config: Config, project_root: str) -> Account:
 
     profile_path = os.path.join(project_root, "assets", "profile.jpg")
     account.profile_picture = profile_path
-    account.logger.info(
+    logger.info(
         f"Account Information: {account.info['display_name']}\n"
         f"\tCompressed Key: {account.info['compressed_key']}\n"
         f"\tPublic Key: {account.info['public_key']}\n"
@@ -75,6 +78,8 @@ def init_database(config: Config) -> Database:
 
 
 def main():
+    setup_logging()
+
     parser = argparse.ArgumentParser(
         description="Status Bot - Modular monitoring framework"
     )
@@ -87,14 +92,13 @@ def main():
 
     config_path = args.config
 
-    logger = Logger()
-
     try:
         logger.info("Loading the configuration")
         Config._yaml_file = config_path
         config = Config()
+        setup_logging(config)
     except Exception as e:
-        logger.error(f"Failed to load config: {e}")
+        logger.error(f"Failed to load config: {e}", exc_info=True)
         sys.exit(1)
 
     logger.info("Status Bot starting...")
@@ -102,10 +106,15 @@ def main():
     project_root = os.path.dirname(os.path.abspath(__file__))
 
     try:
-        logger.info(f"{config}")
+        logger.info(
+            "Configuration loaded: backend=%s database=%s modules=%s",
+            config.backend.domain,
+            config.database.type,
+            config.modules.enabled,
+        )
         account = create_bot(config, project_root)
     except Exception as e:
-        logger.error(f"Failed to create bot account: {e}")
+        logger.error(f"Failed to create bot account: {e}", exc_info=True)
         sys.exit(1)
 
     db = None
@@ -122,7 +131,7 @@ def main():
             db.init_tables()
             logger.info(f"Database connection established ({config.database.type})")
         except Exception as e:
-            logger.warning(f"Failed to connect to database: {e}")
+            logger.warning(f"Failed to connect to database: {e}", exc_info=True)
             logger.warning("Continuing without database connection")
     else:
         logger.info("No database configuration found, running without database")
@@ -133,11 +142,11 @@ def main():
     if config.api.enable and "api_server" not in config.modules.enabled:
         config.modules.enabled.append("api_server")
 
-    manager = ModuleManager(config.modules, account, db, logger, shared_state=shared_state)
+    manager = ModuleManager(config.modules, account, db, shared_state=shared_state)
     manager.discover_modules()
     manager.load_modules()
 
-    start_prometheus(config.metrics, manager, logger)
+    start_prometheus(config.metrics, manager)
 
     stop_event = manager._stop_event
 

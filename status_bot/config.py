@@ -1,6 +1,14 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import YamlConfigSettingsSource
+
+
+class LoggingConfig(BaseModel):
+    format: Literal["human", "json"] = "human"
+    level: Literal["debug", "info", "warning", "error"] = "info"
+    uvicorn_access: bool = False
 
 
 class BackendConfig(BaseModel):
@@ -63,6 +71,7 @@ class Config(BaseSettings):
     )
 
     sleep: int = 10
+    logging: LoggingConfig = LoggingConfig()
     files: FilesConfig = FilesConfig()
     bot: BotConfig = BotConfig()
     backend: BackendConfig = BackendConfig()

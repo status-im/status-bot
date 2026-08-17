@@ -7,7 +7,7 @@ from status_bot.modules.base import BaseModule, ModuleType
 from status_bot.modules.utils import camel_to_snake, generate_salt, to_hmac_sha256_hash
 from status_bot.constants import _MESSAGE_DETERMINISTIC_COLUMNS, _MESSAGE_DROP_COLUMNS,_MESSAGE_SALTED_COLUMNS, _CHAT_SALTED_COLUMNS, _CHAT_DETERMINISTIC_COLUMNS, _SALT_COLUMN
 
-logger = logging.getLogger("status_bot.receiver")
+logger = logging.getLogger(__name__)
 
 
 def transform_dataframe(
@@ -69,7 +69,7 @@ class ReceiverModule(BaseModule):
         self._pepper = config.bot.bot_hash_pepper if config else ""
 
         if self.ctx.db is None:
-            self.ctx.logger.warning("Receiver: no database configured, disabling")
+            logger.warning("Receiver: no database configured, disabling")
             self._disabled = True
             return
 
@@ -86,7 +86,7 @@ class ReceiverModule(BaseModule):
 
         messages = event_data.get("messages", [])
         if messages:
-            self.ctx.logger.info(f"message received {messages}")
+            logger.info(f"Received {len(messages)} message(s)")
             self._process_and_insert(
                 messages,
                 self._messages_table,
@@ -128,6 +128,6 @@ class ReceiverModule(BaseModule):
         df["received_timestamp"] = datetime.datetime.now()
 
         self.ctx.db.insert(df, table_name, [])
-        self.ctx.logger.info(
+        logger.info(
             f"Receiver: stored {len(df)} record(s) in {table_name}"
         )

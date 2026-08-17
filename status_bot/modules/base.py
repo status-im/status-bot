@@ -3,7 +3,6 @@ from typing import Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 import threading
-import logging
 
 
 class ModuleType(Enum):
@@ -30,7 +29,6 @@ class ModuleConfig:
 class ModuleContext:
     account: Any
     config: ModuleConfig
-    logger: logging.Logger
     db: Optional[Any] = None
     shared_state: dict = field(default_factory=dict)
     stop_event: Optional[threading.Event] = None

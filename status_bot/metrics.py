@@ -4,8 +4,10 @@ from status_bot.config import MetricsConfig
 from status_bot.modules.manager import ModuleManager
 from prometheus_client import start_http_server, Gauge, Counter
 
+logger = logging.getLogger(__name__)
 
-def start_prometheus(metrics_config: MetricsConfig, manager: ModuleManager, logger: logging.Logger):
+
+def start_prometheus(metrics_config: MetricsConfig, manager: ModuleManager):
     if not metrics_config.enabled:
         logger.info("Prometheus metrics exporter disabled")
         return

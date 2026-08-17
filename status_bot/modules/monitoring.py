@@ -1,11 +1,14 @@
 import datetime
 import os
+import logging
 from pathlib import Path
 
 import pandas as pd
 
 from status_bot.modules.base import BaseModule, ModuleType
 from status_bot.modules.utils import save_file, to_midnight, to_sha256_hash
+
+logger = logging.getLogger(__name__)
 
 
 def extract_community_channels(account, community: dict, latest_dates: dict[str, pd.Timestamp]) -> pd.DataFrame:
@@ -33,16 +36,16 @@ def extract_community_channels(account, community: dict, latest_dates: dict[str,
         else:
             start_timestamp = to_midnight(now - datetime.timedelta(days=30))
 
-        account.logger.info(
+        logger.info(
             f"Starting message extraction for # {channel['name']} [{start_timestamp} - {now}]"
         )
         messages = account.get_messages(channel["chat_id"], start_timestamp, now)
         messages = pd.DataFrame(messages)
         if len(messages) == 0:
-            account.logger.info("No messages found")
+            logger.info("No messages found")
             continue
 
-        account.logger.info(f"Extracted {len(messages)} message(s)")
+        logger.info(f"Extracted {len(messages)} message(s)")
         messages = messages.assign(
             community_id=community["id"],
             extracted_timestamp=now,
@@ -74,7 +77,7 @@ def extract_community_channels(account, community: dict, latest_dates: dict[str,
         deleted=extracted_data["deleted"].fillna(False),
         seen=extracted_data["seen"].fillna(False),
     )
-    account.logger.info("Sensitive data has been hashed")
+    logger.info("Sensitive data has been hashed")
 
     return extracted_data
 
@@ -99,7 +102,7 @@ class MonitoringModule(BaseModule):
     def execute(self) -> None:
         config = self.ctx.shared_state.get("config")
         if config is None:
-            self.ctx.logger.error("MonitoringModule: config not found in shared_state")
+            logger.error("MonitoringModule: config not found in shared_state")
             return
 
         project_root = self.ctx.shared_state.get("project_root")
@@ -107,7 +110,6 @@ class MonitoringModule(BaseModule):
             project_root = os.path.dirname(os.path.abspath(__file__))
 
         account = self.ctx.account
-        logger = self.ctx.logger
 
         upload_folder = self.ctx.config.settings.get("upload_folder", "uploads")
         upload_path = os.path.join(project_root, upload_folder)
@@ -116,7 +118,7 @@ class MonitoringModule(BaseModule):
         self._download(account, upload_path, current_state_path, config)
 
         if self.ctx.db is not None:
-            self._store(upload_path, current_state_path, config, logger)
+            self._store(upload_path, current_state_path, config)
         else:
             logger.info("No database configured, skipping store step")
 
@@ -128,7 +130,7 @@ class MonitoringModule(BaseModule):
         get_file_name = lambda: str(to_midnight(datetime.datetime.now()).timestamp()).replace(".", "")
         communities = account.communities
         if not communities:
-            account.logger.warning("No communities found...")
+            logger.warning("No communities found...")
             return
 
         for community in communities:
@@ -139,22 +141,22 @@ class MonitoringModule(BaseModule):
             messages_folder = os.path.join(upload_path, "messages", community_folder_name)
             community_info_folder = os.path.join(upload_path, "community", community_folder_name)
 
-            account.logger.info(f"Extracting data for {community['name']}")
+            logger.info(f"Extracting data for {community['name']}")
             community["extracted_timestamp"] = datetime.datetime.now()
 
             file_path = os.path.join(community_info_folder, get_file_name() + ".pkl")
             if not os.path.exists(file_path):
                 save_file(file_path, community)
-                account.logger.info(f"Created {file_path}")
+                logger.info(f"Created {file_path}")
 
             file_path = os.path.join(messages_folder, get_file_name() + ".csv")
             if not os.path.exists(file_path):
                 messages = extract_community_channels(account, community, latest_dates)
                 if len(messages) > 0:
                     save_file(file_path, messages)
-                    account.logger.info(f"Created {file_path}")
+                    logger.info(f"Created {file_path}")
 
-    def _store(self, upload_path: str, current_state_path: str, config, logger) -> None:
+    def _store(self, upload_path: str, current_state_path: str, config) -> None:
         path = Path(upload_path)
         table_name_mapping: dict[str, str] = config.database.tables
 

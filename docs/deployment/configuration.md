@@ -19,6 +19,27 @@ The `--config` argument defaults to `./config.yaml`.
 
 ---
 
+## Logging
+
+The bot logs to **stdout/stderr**. Human-readable lines are the default; JSON output can be enabled for log aggregators.
+
+| Field | Type | Default | Env var | Description |
+|-------|------|---------|---------|-------------|
+| `format` | `human` \| `json` | `"human"` | `LOGGING__FORMAT` | Output format. `human` prints `time | LEVEL | thread | logger | message`; `json` emits one flat JSON object per line (`timestamp`, `level`, `logger`, `thread`, `message`, `exception`) |
+| `level` | `debug` \| `info` \| `warning` \| `error` | `"info"` | `LOGGING__LEVEL` | Minimum severity logged. Applies to the root logger; noisy libraries (`sqlalchemy`, `urllib3`, `websockets`) are always quieted to `warning` |
+| `uvicorn_access` | `bool` | `false` | `LOGGING__UVICORN_ACCESS` | When `true`, the FastAPI/uvicorn per-request access logs are enabled (they inherit the chosen `format`) |
+
+```yaml
+logging:
+    format: human   # or json
+    level: info
+    uvicorn_access: false
+```
+
+> **Security**: secret values (`bot.password`, `bot.mnemonic_phrase`, `bot.infura_token`, `bot.coingecko_api_key`, `bot.bot_hash_pepper`, `api.api_key`, `database.password`) are masked as `[REDACTED]` in any log line, wherever they appear.
+
+---
+
 ## Reference
 
 ### `sleep`

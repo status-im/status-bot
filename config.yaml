@@ -9,6 +9,12 @@ database:
     community: "raw_community_info"
 # Value must be in MINUTES
 sleep: 10
+
+# logging:
+#   format: human   # human | json
+#   level: info     # debug | info | warning | error
+#   uvicorn_access: false   # true to enable FastAPI per-request access logs
+
 files:
   # Get the latest community chat dates for next run
   current_state: "dates.pkl"

@@ -9,7 +9,7 @@ from hashlib import sha256
 import pandas as pd
 from typing import Any
 
-logger = logging.getLogger("status_bot.utils")
+logger = logging.getLogger(__name__)
 
 _PEPPER_WARNED = False
 

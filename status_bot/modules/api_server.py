@@ -1,3 +1,4 @@
+import logging
 import threading
 
 import uvicorn
@@ -5,6 +6,18 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from status_bot.modules.base import BaseModule, ModuleType
+
+logger = logging.getLogger(__name__)
+
+UVICORN_LOG_CONFIG = {
+    "version": 1,
+    "incremental": True,
+    "loggers": {
+        "uvicorn": {"propagate": True, "handlers": []},
+        "uvicorn.error": {"propagate": True, "handlers": []},
+        "uvicorn.access": {"propagate": True, "handlers": []},
+    },
+}
 
 
 class APIServerModule(BaseModule):
@@ -40,13 +53,14 @@ class APIServerModule(BaseModule):
 
     def execute(self):
         if not self.ctx.shared_state["config"].api.enable:
-            self.ctx.logger.info("API server is disabled, skipping startup")
+            logger.info("API server is disabled, skipping startup")
             return
 
         config = uvicorn.Config(
             self._app,
             host=self._host,
             port=self._port,
+            log_config=UVICORN_LOG_CONFIG,
             log_level="info",
         )
         server = uvicorn.Server(config)
