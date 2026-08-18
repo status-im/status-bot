@@ -1,0 +1,104 @@
+/* ==========================================================================
+   Status.app Theme Overrides for MkDocs Material
+   ========================================================================== */
+
+:root,
+[data-md-color-scheme="slate"] {
+  /* Status Palette */
+  --status-bg: #090a10;            /* Ultra-dark background */
+  --status-card-bg: #12141d;       /* Card/sidebar background */
+  --status-accent-blue: #4360df;    /* Primary brand blue */
+  --status-accent-purple: #814bf6;  /* Accent purple */
+  --status-text: #eceef8;           /* Primary text */
+  --status-text-muted: #8b92b0;     /* Muted secondary text */
+  --status-border: #1e2235;         /* Soft subtle border */
+
+  /* Material Theme Token Remapping */
+  --md-default-bg-color: var(--status-bg);
+  --md-default-bg-color--light: var(--status-card-bg);
+  --md-default-bg-color--lighter: #1a1d2c;
+  --md-default-fg-color: var(--status-text);
+  --md-default-fg-color--light: var(--status-text-muted);
+  --md-default-fg-color--lighter: #687093;
+
+  /* Primary Accent & Links */
+  --md-primary-fg-color: var(--status-bg);
+  --md-accent-fg-color: var(--status-accent-blue);
+
+  /* Code Syntax Highlighting Cards */
+  --md-code-bg-color: #0d0f17;
+  --md-code-fg-color: #e2e8f0;
+}
+
+/* Base Body & Layout */
+body {
+  background-color: var(--status-bg);
+  color: var(--status-text);
+}
+
+/* Header Navbar */
+.md-header {
+  background-color: rgba(9, 10, 16, 0.85) !important;
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--status-border);
+}
+
+/* Navigation & Sidebar Cards */
+.md-sidebar__inner {
+  background-color: var(--status-card-bg);
+  border-radius: 12px;
+  border: 1px solid var(--status-border);
+  padding: 1rem;
+}
+
+.md-nav__link {
+  color: var(--status-text-muted);
+  border-radius: 6px;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.md-nav__link--active,
+.md-nav__link:hover {
+  color: #ffffff !important;
+  background-color: rgba(67, 96, 223, 0.15);
+}
+
+/* Content Area Styling */
+.md-content {
+  background-color: var(--status-bg);
+}
+
+/* Code Blocks */
+.md-typeset pre > code {
+  border-radius: 10px;
+  border: 1px solid var(--status-border);
+  background-color: var(--status-card-bg);
+}
+
+/* Admonitions / Callout Boxes */
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: 10px;
+  border: 1px solid var(--status-border);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  background-color: var(--status-card-bg);
+}
+
+.md-typeset .admonition.note {
+  border-left-color: var(--status-accent-blue);
+}
+
+.md-typeset .admonition.tip {
+  border-left-color: var(--status-accent-purple);
+}
+
+/* Links */
+.md-typeset a {
+  color: #6380ff;
+  text-decoration: none;
+}
+
+.md-typeset a:hover {
+  color: #a3b5ff;
+  text-decoration: underline;
+}

@@ -1,13 +1,14 @@
 # Configuration
 
-The bot is configured through a YAML file (`config.yaml`) and environment variables.
-Environment variables override values from the YAML file.
+The bot is configured through a YAML file (`config.yaml`), environment variables, and an optional `.env` file.
 
 ## Loading order
 
-1. `config.yaml` — base configuration
-2. Shell environment variables — override YAML values
-3. `.env` file — override YAML values (loaded from the same directory as `config.yaml`)
+Sources are resolved in priority order (highest first). A value is taken from the first source that defines it; later sources only fill in settings not set by a higher-priority source:
+
+1. `config.yaml` — highest priority; overrides environment variables and the `.env` file
+2. Shell environment variables — override the `.env` file
+3. `.env` file — lowest priority, used as fallback (loaded from the current working directory)
 
 ## Usage
 
@@ -42,12 +43,6 @@ logging:
 
 ## Reference
 
-### `sleep`
-
-| Type | Default | Description |
-|------|---------|-------------|
-| `int` | `10` | Sleep interval in minutes between monitoring cycles |
-
 ### `files`
 
 | Field | Type | Default | Description |
@@ -66,7 +61,7 @@ files:
 | Field | Type | Default | Env var | Description |
 |-------|------|---------|---------|-------------|
 | `name` | `str` | `""` | `BOT__NAME` | Status display name used to log in |
-| `public_key` | `str` | `"BOT__PUBLIC_KEY"` | — | Expected public key for verification |
+| `public_key` | `str` | `""` | `BOT__PUBLIC_KEY` | Expected public key for verification |
 | `password` | `str` | `""` | `BOT__PASSWORD` | Status account password |
 | `mnemonic_phrase` | `str` | `""` | `BOT__MNEMONIC_PHRASE` | 12-word recovery phrase (used when `init_account: true`) |
 | `init_account` | `bool` | `false` | `BOT__INIT_ACCOUNT` | If `false`, the account must already exist. If `true`, creates or restores the account using `mnemonic_phrase` |
@@ -78,7 +73,7 @@ files:
 
 ```yaml
 bot:
-    display_name: 'my-bot'
+    name: 'my-bot'
     public_key: '0x...'
     password: 'ChangeMe'
     mnemonic_phrase: 'word1 word2 ... word12'
@@ -93,7 +88,7 @@ Parameter to connect to the Status Backend instance.
 | Field | Type | Default | Env var | Description |
 |-------|------|---------|---------|-------------|
 | `domain` | `str` | `"localhost"` | `BACKEND__DOMAIN` | Status Backend hostname (`localhost` for local, `status-backend` for Docker) |
-| `port` | `int` | `8080` | `BACKEND__BACKEND_PORT` | Status Backend API port |
+| `backend_port` | `int` | `8080` | `BACKEND__BACKEND_PORT` | Status Backend API port |
 | `is_secure` | `bool` | `false` | `BACKEND__IS_SECURE` | Use HTTPS instead of HTTP |
 ```yaml
 backend:
@@ -191,7 +186,7 @@ Event payloads are kept in plaintext in-memory so they can be handled correctly;
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `directories` | `list[str]` | `["./modules"]` | Directories to scan for module `.py` files |
+| `directories` | `list[str]` | `["./modules", "bot/modules"]` | Directories to scan for module `.py` files |
 | `enabled` | `list[str]` | `[]` | List of module names to enable |
 | `settings` | `dict` | `{}` | Per-module settings (each module defines its own schema) |
 

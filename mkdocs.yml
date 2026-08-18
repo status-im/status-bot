@@ -1,0 +1,40 @@
+site_name: Status Bot Documentation
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: custom
+      accent: custom
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.sections
+    - navigation.instant
+    - navigation.tracking
+    - content.code.copy
+    - content.code.annotate
+
+extra_css:
+  - stylesheets/extra.css
+
+nav:
+  - index.md
+  - Usage:
+      - Messaging: usage/messaging.md
+      - Monitoring: usage/monitoring.md
+  - Deployment:
+      - Configuration: deployment/configuration.md
+      - Docker: deployment/docker.md
+      - Metrics: deployment/metrics.md
+  - Development:
+      - Database: development/database.md
+      - Modules: development/modules.md
+
+markdown_extensions:
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format

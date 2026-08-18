@@ -24,6 +24,7 @@ graph TB
 The Status Bot use [status-python-sdk](https://github.com/status-im/status-python-sdk) for the interraction with Status Backend.
 
 The Status-Backend use external services:
+
 * CoinGecko - Optional to get token price
 * EVM access - (Infura for example) required to interract with Token Gated community.
 
@@ -51,4 +52,4 @@ It first need to export a backup, then import it in the docker container under `
 
 > Note: the account backup need to also be imported in Status Backend
 
-The full configuration explaination can be found at [./deployment/configuration.md]
+The full configuration explaination can be found in the [configuration](deployment/configuration.md) page.
