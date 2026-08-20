@@ -30,6 +30,10 @@ def start_prometheus(metrics_config: MetricsConfig, manager: ModuleManager):
     for module_name in manager.module_names:
         module_loaded.labels(module=module_name).set(1)
 
+    for module_name in manager.module_names:
+        module = manager.modules[module_name]
+        module.register_metrics()
+
     host = metrics_config.host
     port = metrics_config.port
     start_http_server(port, host)
