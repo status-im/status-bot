@@ -5,9 +5,11 @@ import os
 import pickle
 import re
 from hashlib import sha256
-
+import json
 import pandas as pd
 from typing import Any
+
+from status_bot.models import ContactRequest
 
 logger = logging.getLogger(__name__)
 
@@ -58,3 +60,25 @@ def save_file(file_path: str, data: Any):
 
     with open(file_path, "wb") as f:
         pickle.dump(data, f)
+
+
+def extract_contact_request(event: dict, new_user_message: str) -> ContactRequest:
+    body = event.get('body')
+    if body is None:
+        raise ValueError("Missing Body from the ContactRequest")
+    contact_event = body.get("contact")
+    if contact_event is None:
+        raise ValueError("Missing contact part from the ContactRequest")
+    return ContactRequest(
+            id=body.get("message").get("id"),
+            public_key=contact_event.get("id"),
+            request_message=event.get("message"),
+            request_timestamp=datetime.datetime.fromtimestamp(
+                event.get("timestamp", 0) / 1_000
+            ),
+            conversation_id=event.get("conversationId"),
+            is_new_user=event.get("message") == new_user_message
+        )
+
+def is_message_removed_concact(message: dict) -> bool:
+    return message.get("text") == f"@{message.get('from')} removed you as a contact"

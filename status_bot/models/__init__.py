@@ -3,5 +3,8 @@ from .message import ReceivedMessage
 from .chat import ReceivedChat
 from .community import RawCommunityInfo, RawMessage
 from .channel import Channel
+from .contact_request import ContactRequest
+from .support_message import SupportMessage
 
-__all__ = ["Base", "namespace", "model_by_table", "ReceivedMessage", "ReceivedChat", "RawCommunityInfo", "RawMessage", "Channel"]
+__all__ = ["Base", "namespace", "model_by_table", "ReceivedMessage", "ReceivedChat",
+           "RawCommunityInfo", "RawMessage", "Channel", "ContactRequest", "SupportMessage"]

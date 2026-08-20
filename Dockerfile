@@ -5,6 +5,7 @@ WORKDIR /app
 # Copy dependency metadata first (better cache invalidation)
 COPY pyproject.toml ./
 
+RUN apt update && apt install git curl -y
 # Install package and dependencies
 RUN pip install --no-cache-dir -e .
 

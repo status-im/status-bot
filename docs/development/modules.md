@@ -36,9 +36,9 @@ class MyModule(BaseModule):
 ```
 ### Properties
 
-#### `seconds_interval`
+#### `interval`
 
-Number of seconds to wait between every `ModuleType.PERIODIC` run. This value can be set within `modules > settings`.
+Number of minutes to wait between every `ModuleType.PERIODIC` run. This value can be set within the module config `modules.settings.$module_name.interval`.
 
 #### `db_schema`
 

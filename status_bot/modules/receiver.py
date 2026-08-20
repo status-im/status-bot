@@ -84,10 +84,7 @@ class ReceiverModule(BaseModule):
     def execute(self):
         pass
 
-    def on_event(self, event: dict):
-        if self._disabled:
-            return
-
+    def on_event(self, event_type: str, event: dict):
         event_data = event.get("event", {})
 
         messages = event_data.get("messages", [])

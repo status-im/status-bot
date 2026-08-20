@@ -18,6 +18,8 @@ class BackendConfig(BaseModel):
 class BotConfig(BaseModel):
     name: str = ""
     chat_key: str = ""
+    bio: str = "Just a bot"
+    profil_picture_path: str = "assets/profile.jpg"
     password: str = ""
     mnemonic_phrase: Optional[str] = None
     infura_token: Optional[str] = None
