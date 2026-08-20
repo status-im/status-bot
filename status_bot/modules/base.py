@@ -6,6 +6,8 @@ from status_sdk import Account
 from status_bot import Database
 import threading, logging
 
+from prometheus_client import Counter, Gauge
+
 
 class ModuleType(Enum):
     PERIODIC = "periodic"
@@ -92,6 +94,14 @@ class BaseModule(ABC):
 
     def on_event(self, event: dict) -> Any:
         return None
+
+    def register_metrics(self) -> None:
+        """Override in subclasses to register custom Prometheus metrics.
+
+        Metrics registered here will be exposed alongside the built-in bot metrics.
+        The module name will be automatically added as a label to all registered metrics.
+        """
+        pass
 
     @property
     def is_running(self) -> bool:
