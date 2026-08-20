@@ -9,6 +9,8 @@ from hashlib import sha256
 import pandas as pd
 from typing import Any
 
+from status_bot.models import ContactRequest
+
 logger = logging.getLogger(__name__)
 
 _PEPPER_WARNED = False
@@ -52,3 +54,21 @@ def save_file(file_path: str, data: Any):
 
     with open(file_path, "wb") as f:
         pickle.dump(data, f)
+
+
+def extract_contact_request(event: dict) -> ContactRequest:
+    body = event.get('body')
+    if body is None:
+        raise ValueError("Missing Body from the ContactRequest")
+    contact_event = body.get("contact")
+    if contact_event is None:
+        raise ValueError("Missing contact part from the ContactRequest")
+    return ContactRequest(
+            id=body.get("id"),
+            public_key=contact_event.get("id"),
+            contact_name=contact_event.get("name"),
+            request_message=event.get("message"),
+            request_timestamp=event.get("timestamp", 0),
+            conversation_id=event.get("conversationId")
+        )
+

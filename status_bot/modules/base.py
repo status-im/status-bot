@@ -63,7 +63,7 @@ class BaseModule(ABC):
     def on_stop(self) -> None:
         pass
 
-    def on_event(self, event: dict) -> Any:
+    def on_event(self, event_type: str, event: dict) -> Any:
         return None
 
     @property

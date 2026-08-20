@@ -55,9 +55,3 @@ class CommunitiesMonitoring(BaseModule):
                         token_gated=permissions.get("posting", False),
                     ))
             session.commit()
-
-    def on_stop(self):
-        pass
-
-    def on_event(self, event: dict):
-        pass

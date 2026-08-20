@@ -2,11 +2,12 @@ import os
 import importlib.util
 import threading
 import logging
-from typing import Optional, Type
+from typing import Type
 from pathlib import Path
 
 from .base import BaseModule, ModuleConfig, ModuleContext, ModuleType
 from status_bot.config import ModulesConfig
+from status_bot.constants import EventTypeEnum
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ class ModuleManager:
         self._threads: dict[str, threading.Thread] = {}
         self._stop_event = threading.Event()
         self._shared_state = shared_state or {}
+        self._event_modules: dict[str, BaseModule] = {}
 
     @property
     def modules(self) -> dict[str, BaseModule]:
@@ -124,6 +126,8 @@ class ModuleManager:
             try:
                 module = module_class(ctx)
                 self._modules[module_name] = module
+                if module.module_type == ModuleType.EVENT:
+                    self._event_modules[module_name] = module
                 logger.info(f"Loaded module: {module_name}")
             except Exception as e:
                 logger.error(f"Failed to load module '{module_name}': {e}")
@@ -139,6 +143,15 @@ class ModuleManager:
             self._threads[name] = t
             t.start()
             logger.info(f"Started module thread: {name}")
+
+        # Start centralized event listener thread
+        self._event_listener_thread = threading.Thread(
+            target=self._run_event_listener,
+            daemon=True,
+            name="event-listener",
+        )
+        self._event_listener_thread.start()
+        logger.info("Started event listener thread")
 
     def stop_all(self) -> None:
         logger.info("Stopping all modules...")
@@ -163,7 +176,10 @@ class ModuleManager:
                 if module.module_type == ModuleType.PERIODIC:
                     self._run_periodic(module)
                 elif module.module_type == ModuleType.EVENT:
-                    self._run_event(module)
+                    # Event listening is centralized in the manager;
+                    # wait until stop event is set
+                    while not self._stop_event.is_set():
+                        self._stop_event.wait(1)
                 elif module.module_type == ModuleType.SERVICE:
                     module.execute()
 
@@ -196,15 +212,18 @@ class ModuleManager:
             module.execute()
             self._stop_event.wait(interval)
 
-    def _run_event(self, module: BaseModule) -> None:
-        for event in self._account.listen_messages():
+    def _run_event_listener(self) -> None:
+        for message in self._account.signal.listen([EventTypeEnum.LOCAL_NOTIFICATION.value,EventTypeEnum.MESSAGE.value]):
+            event_type = message.get('type')
+            logger.info(f"Received a {event_type}")
             if self._stop_event.is_set():
                 break
             try:
-                module.on_event(event)
+                for module in self._event_modules.values():
+                    module.on_event(event_type, message)
             except Exception as e:
                 logger.error(
-                    f"Error in event module '{module.name}': {e}",
+                    f"Error in event listener: {e}",
                     exc_info=True,
                 )
 
