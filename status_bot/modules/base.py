@@ -2,7 +2,9 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
-import threading
+from status_sdk import Account
+from status_bot import Database
+import threading, logging
 
 
 class ModuleType(Enum):
@@ -27,9 +29,9 @@ class ModuleConfig:
 
 @dataclass
 class ModuleContext:
-    account: Any
+    account: Account
     config: ModuleConfig
-    db: Optional[Any] = None
+    db: Optional[Database] = None
     shared_state: dict = field(default_factory=dict)
     stop_event: Optional[threading.Event] = None
 
@@ -38,11 +40,36 @@ class BaseModule(ABC):
 
     def __init__(self, ctx: ModuleContext):
         self._ctx = ctx
+        self.__logger = logging.getLogger(self.__class__.__name__)
         self._running = False
+        self.__settings = ctx.config.settings
+        self.__interval = ctx.config.settings.get("interval", ctx.config.interval)
+        self.__db_schema = self.__settings.get("schema", self.ctx.config.name)
+        self.__account = self.ctx.account
+
+    @property
+    def seconds_interval(self) -> int:
+        return self.__interval
 
     @property
     def ctx(self) -> ModuleContext:
         return self._ctx
+
+    @property
+    def settings(self) -> dict:
+        return self.__settings
+
+    @property
+    def account(self) -> Account:
+        return self.__account
+
+    @property
+    def logger(self) -> logging.Logger:
+        return self.__logger
+
+    @property
+    def db_schema(self) -> str:
+        return self.__db_schema
 
     @property
     @abstractmethod
@@ -58,7 +85,7 @@ class BaseModule(ABC):
         ...
 
     def on_start(self) -> None:
-        pass
+        self.logger.info(f"Starting module {self.__class__.__name__}")
 
     def on_stop(self) -> None:
         pass

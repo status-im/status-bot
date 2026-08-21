@@ -13,11 +13,13 @@ graph TB
    subgraph external[External Services]
         COINGECKO[CoinGecko]
         INFURA[Infura]
+        ALCHEMY[Alchemy]
     end
 
    BOT --> BACKEND
    BACKEND --> |coingecko_api_key| COINGECKO
    BACKEND --> |infura_token| INFURA
+   BACKEND --> |alchemy_token| ALCHEMY
    BOT --> DB
 ```
 
@@ -26,7 +28,8 @@ The Status Bot use [status-python-sdk](https://github.com/status-im/status-pytho
 The Status-Backend use external services:
 
 * CoinGecko - Optional to get token price
-* EVM access - (Infura for example) required to interract with Token Gated community.
+* EVM access - Required to interract with Token Gated community. Only Infura EVM works.
+* Alchemy - Optional to get account transactions 
 
 ## Account Setup
 
@@ -38,17 +41,18 @@ The account can be initialized at startup with the following configuration:
 
 ```yaml
 bot:
-  init_account: true
-  display_name: 'status-bot'
-  password: 'ChangeMeIfYouCare'
-  mnemonic_phrase: 'twelve characters list ...'
-  compressed_key: 'compressed-key'
+    password: 'Gonster2026!'
+    mnemonic_phrase: "ETH seed phrase"
+    chat_key: 'zQ3..Example'
+    name: 'Display Name'
+    infura_token: 'Your Infura token'
+    coingecko_api_key: 'Your Coingecko API key'
+    alchemy_token: 'Your Alchemy token'
 ```
 
 ### Importing Status Account
 
-The account can also be imported from the Status Application.
-It first need to export a backup, then import it in the docker container under `/backups`.
+The account can also be imported from the Status Application. It first need to export a backup, then import it in the docker container under `/backups`.
 
 > Note: the account backup need to also be imported in Status Backend
 

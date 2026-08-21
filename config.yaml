@@ -1,48 +1,45 @@
 database:
-  type: postgres
-  host: "database"
-  port: 5432
-  schema: "status_app_monitoring"
-  name: "status-bot"
-  tables:
-    messages: "raw_messages"
-    community: "raw_community_info"
+    type: postgres
+    host: "localhost"
+    port: 5432
+    name: "status-bot"
 
- logging:
-   format: human
-   level: info
-   uvicorn_access: false
-
-files:
-  # Get the latest community chat dates for next run
-  current_state: "dates.pkl"
+logging:
+    format: human
+    level: info
+    uvicorn_access: false
 
 bot:
-  init_account: true
-  name: 'status-bot'
-  public_key: "0xExample"
-  bot_hash_pepper: '' #Use a large random value
+    name: 'status-bot'
+    chat_key: "zQ3..Example"
+    bot_hash_pepper: '' # Use a large random value
 
 backend:
-  domain: "status-backend"
-  backend_port: 8080
-  is_secure: false
+    domain: "localhost"
+    backend_port: 8080
+    is_secure: false
 
 api:
-  enable: true
-  host: "0.0.0.0"
-  port: 8081
-  # api_key: "your-secret-key"
+    enable: true
+    host: "0.0.0.0"
+    port: 8081
+    # api_key: "your-secret-key"
 
 modules:
-  directories: []
-  enabled: ["messaging", "receiver"]
-  settings:
-    receiver:
-      messages_table: "received_messages"
-      chats_table: "received_chats"
-
+    directories: []
+    enabled: ["messaging", "receiver", "community_monitoring"]
+    settings:
+        receiver:
+            messages_table: "received_messages"
+            chats_table: "received_chats"
+        community_monitoring:
+            interval: 900
+            schema: "status_app_monitoring"
+            detoxify: true
+            communities:
+                - Status
+                - Logos
 metrics:
-  enabled: true
-  host: "0.0.0.0"
-  port: 8000
+    enabled: true
+    host: "0.0.0.0"
+    port: 8000

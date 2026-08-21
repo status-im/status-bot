@@ -34,8 +34,25 @@ class MyModule(BaseModule):
     def on_event(self, event: dict):
         ...  # handle a signal event (EVENT type only)
 ```
+### Properties
 
-### ModuleContext
+#### `seconds_interval`
+
+Number of seconds to wait between every `ModuleType.PERIODIC` run. This value can be set within `modules > settings`.
+
+#### `db_schema`
+
+The schema name you can upload data to.
+
+#### `account`
+
+Logged in Status account that can be used within the module.
+
+#### `logger`
+
+Set up logger that can be used within modules.
+
+#### `ctx`
 
 Every module receives a `ModuleContext` via the constructor, accessible as `self.ctx`:
 
@@ -47,7 +64,7 @@ Every module receives a `ModuleContext` via the constructor, accessible as `self
 | `shared_state` | `dict` | Cross-module shared data |
 | `stop_event` | `threading.Event` | Set when the bot is shutting down |
 
-### ModuleConfig
+##### `ModuleConfig`
 
 Each module receives only its own settings from `config.yaml`:
 

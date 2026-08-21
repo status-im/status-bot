@@ -7,13 +7,15 @@ from pathlib import Path
 
 from .base import BaseModule, ModuleConfig, ModuleContext, ModuleType
 from status_bot.config import ModulesConfig
+from status_bot import Database
+from status_sdk import Account
 
 logger = logging.getLogger(__name__)
 
 
 class ModuleManager:
 
-    def __init__(self, modules_config: ModulesConfig, account, db, shared_state: dict = None):
+    def __init__(self, modules_config: ModulesConfig, account: Account, db: Database, shared_state: dict = None):
         self._modules_config = modules_config
         self._account = account
         self._db = db
@@ -191,13 +193,14 @@ class ModuleManager:
                     pass
 
     def _run_periodic(self, module: BaseModule) -> None:
-        interval = module.ctx.config.interval
         while not self._stop_event.is_set():
             module.execute()
-            self._stop_event.wait(interval)
+            seconds = module.seconds_interval
+            logger.info(f"Sleeping for {seconds}s")
+            self._stop_event.wait(seconds)
 
     def _run_event(self, module: BaseModule) -> None:
-        for event in self._account.listen_messages():
+        for event in self._account.signal.listen():
             if self._stop_event.is_set():
                 break
             try:
