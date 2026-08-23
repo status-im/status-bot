@@ -76,6 +76,16 @@ class BaseModule(ABC):
         """
         pass
 
+    def _verify_mandatory_config(self, config_fields: list[str]):
+        missing_field = []
+        for field in config_fields:
+            if self.ctx.config.settings.get(field) is None:
+                missing_field.append(field)
+        if len(missing_field) > 0:
+            raise ValueError(
+                    f"Missing fields in the config module: {', '.join(missing_field)}")
+
+
     @property
     def is_running(self) -> bool:
         return self._running

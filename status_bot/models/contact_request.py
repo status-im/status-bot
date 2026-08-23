@@ -1,4 +1,4 @@
-from sqlalchemy import  Column, DateTime, BigInteger, String
+from sqlalchemy import Column, Integer, BigInteger, String
 
 from .base import Base
 
@@ -11,3 +11,4 @@ class ContactRequest(Base):
     request_message = Column(String, nullable=True)
     request_timestamp = Column(BigInteger, nullable=False)
     conversation_id = Column(String, nullable=True)
+    last_engagement_message = Column(Integer, nullable=True)
