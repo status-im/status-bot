@@ -5,7 +5,7 @@ import os
 import pickle
 import re
 from hashlib import sha256
-
+import json
 import pandas as pd
 from typing import Any
 
@@ -64,11 +64,12 @@ def extract_contact_request(event: dict) -> ContactRequest:
     if contact_event is None:
         raise ValueError("Missing contact part from the ContactRequest")
     return ContactRequest(
-            id=body.get("id"),
+            id=body.get("message").get("id"),
             public_key=contact_event.get("id"),
-            contact_name=contact_event.get("name"),
             request_message=event.get("message"),
-            request_timestamp=event.get("timestamp", 0),
+            request_timestamp=datetime.datetime.fromtimestamp(
+                event.get("timestamp", 0) / 1_000
+            ),
             conversation_id=event.get("conversationId")
         )
 

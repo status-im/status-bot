@@ -4,18 +4,19 @@ from sqlalchemy import and_, or_
 from prometheus_client import Counter
 from datetime import datetime, timedelta
 from status_bot.modules.base import BaseModule, ModuleType
-from status_bot.models import ContactRequest, message
+from status_bot.models import ContactRequest
 
 logger = logging.getLogger(__name__)
 
 
 def get_all_contact_to_contact(db_session, delay):
-    threshold_timestamp = datetime.utcnow() - timedelta(days=delay)
+    threshold = datetime.utcnow() - timedelta(days=delay)
+    logger.info(f"Threshold {threshold}")
 
     return db_session.query(ContactRequest).filter(
         and_(
-            ContactRequest.requestTimestamp < threshold_timestamp,
-            ContactRequest.other_field < delay
+            ContactRequest.request_timestamp < threshold,
+            ContactRequest.last_engagement_message < delay
         )
     ).all()
 
@@ -42,15 +43,15 @@ class PeriodicEngagement(BaseModule):
         for planned_message in planned_messages:
             _delay = planned_message.get("delay")
             _message = planned_message.get("message")
+            logger.info(f"Looking for contact to send message with delay {_delay}")
             with self.ctx.db.session() as session:
                 contacts = get_all_contact_to_contact(session, _delay)
+                logger.info(f"Found {len(contacts)} contacts to send a messages")
                 for c in contacts:
-                    self.ctx.account.send_message(
-                        chat_id=c.public_key, message=_message)
+                    self.ctx.account.send_message(chat_id=c.public_key, message=_message)
                     c.last_engagement_message = _delay
-                    session.merge(c)
-                    session.commit()
                     self._counter.labels(delay=_delay).inc()
+                session.commit()
 
     def register_metrics(self) -> None:
         self._counter = Counter(

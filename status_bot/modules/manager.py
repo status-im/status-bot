@@ -109,7 +109,7 @@ class ModuleManager:
             module_config = ModuleConfig(
                 name=module_name,
                 enabled=True,
-                interval=module_settings.get("interval", 60),
+                interval=module_settings.get("interval", 600),
                 max_retries=module_settings.get("max_retries", 3),
                 backoff_seconds=module_settings.get("backoff_seconds", 30),
                 settings=module_settings,
