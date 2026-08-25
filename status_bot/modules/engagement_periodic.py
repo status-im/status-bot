@@ -9,14 +9,17 @@ from status_bot.models import ContactRequest
 logger = logging.getLogger(__name__)
 
 
-def get_all_contact_to_contact(db_session, delay):
-    threshold = datetime.utcnow() - timedelta(days=delay)
+def get_all_contact_to_contact(db_session, delay, delay_unit):
+    threshold = datetime.now() - timedelta(days=delay)
+    if delay_unit != "days":
+        threshold = datetime.utcnow() - timedelta(minutes=delay)
     logger.info(f"Threshold {threshold}")
 
     return db_session.query(ContactRequest).filter(
         and_(
             ContactRequest.request_timestamp < threshold,
-            ContactRequest.last_engagement_message < delay
+            ContactRequest.last_engagement_message < delay,
+            ContactRequest.is_new_user
         )
     ).all()
 
@@ -45,7 +48,9 @@ class PeriodicEngagement(BaseModule):
             _message = planned_message.get("message")
             logger.info(f"Looking for contact to send message with delay {_delay}")
             with self.ctx.db.session() as session:
-                contacts = get_all_contact_to_contact(session, _delay)
+                contacts = get_all_contact_to_contact(
+                    session, _delay,
+                    self.ctx.config.settings.get("delay_type", "days"))
                 logger.info(f"Found {len(contacts)} contacts to send a messages")
                 for c in contacts:
                     self.ctx.account.send_message(chat_id=c.public_key, message=_message)

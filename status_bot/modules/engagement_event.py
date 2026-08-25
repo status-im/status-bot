@@ -2,17 +2,17 @@ import logging
 from prometheus_client import Counter
 from status_bot.constants import EventTypeEnum, NotificationCategoryEnum
 from status_bot.models import SupportMessage, ContactRequest
-from status_bot.models.contact_request import ContactRequest
-from status_bot.models.support_message import SupportMessage
 from status_bot.modules.base import BaseModule, ModuleType
-from status_bot.modules.utils import extract_contact_request
+from status_bot.modules.utils import extract_contact_request, is_message_removed_concact
 from status_sdk import GroupChat
 import json
 
 logger = logging.getLogger(__name__)
 
-MANDATORY_CONFIG_FIELD = ["first_messages", "support_keywords",
-                          "helper_message", "automatic_reply", "group_chat"]
+MANDATORY_CONFIG_FIELD = [
+    "first_messages", "support_keywords","helper_message", "automatic_reply", "group_chat",
+    "new_user_message_contact_request", "existing_users_messages"
+]
 
 class EngagementEvent(BaseModule):
 
@@ -31,7 +31,7 @@ class EngagementEvent(BaseModule):
         self._verify_mandatory_config(MANDATORY_CONFIG_FIELD)
         if self.ctx.db is None:
             raise ConnectionError("Database connection not setup")
-        group_chat_config=self.ctx.config.settings.get("group_chat")
+        group_chat_config=self.ctx.config.settings.get("group_chat", {})
         if not group_chat_config.get("group_id"):
             logger.debug("Initializing new GroupChat")
             contacts = [contact["public_key"] for contact in
@@ -58,7 +58,8 @@ class EngagementEvent(BaseModule):
     Function to handle new Contact request from User
     """
     def hanlde_contact_request(self, event_data: dict, db_session):
-        new_contact: ContactRequest = extract_contact_request(event_data)
+        new_contact: ContactRequest = extract_contact_request(
+                event_data, self.ctx.config.settings.get("new_user_message_contact_request", ""))
         self._counter.labels(type="received_request").inc()
         logger.info(f"Accepting the contact request from {new_contact.public_key}")
         self.ctx.account.add_contact(new_contact.public_key)
@@ -66,11 +67,14 @@ class EngagementEvent(BaseModule):
         db_session.commit()
         self._counter.labels(type="accepted_request").inc()
         logger.info(f"Sending first message to {new_contact.public_key}")
-        for msg in self.ctx.config.settings.get('first_messages', []):
+        message_properties = "existing_users_messages"
+        if new_contact.is_new_user:
+            message_properties = "first_messages"
+        for msg in self.ctx.config.settings.get(message_properties, []):
             self.ctx.account.send_message(
                 chat_id=new_contact.public_key,
                 message=msg)
-        self._counter.labels(type="first_messages").inc()
+        self._counter.labels(type=message_properties).inc()
 
     """
         Verify if the message concerne the support or is concidered spam
@@ -153,10 +157,13 @@ class EngagementEvent(BaseModule):
                 return
             if event_type == EventTypeEnum.LOCAL_NOTIFICATION.value and event_data.get("category") == NotificationCategoryEnum.CONTACT_REQUEST.value:
                 self.hanlde_contact_request(event_data, db_session)
-            if event_type == EventTypeEnum.MESSAGE.value and event_data.get("messages") != None:
+                return
+            if event_type == EventTypeEnum.MESSAGE.value and event_data.get("messages") is not None:
                 message = event_data.get("messages",[])[0]
                 if message is None:
                     raise ValueError("No message in the event")
+                if is_message_removed_concact(message):
+                    return
                 if event_data.get("chats")[0].get("id") == self.group_chat.id:
                     self.find_reply(message, db_session)
                 else:

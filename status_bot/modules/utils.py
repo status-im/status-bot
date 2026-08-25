@@ -56,7 +56,7 @@ def save_file(file_path: str, data: Any):
         pickle.dump(data, f)
 
 
-def extract_contact_request(event: dict) -> ContactRequest:
+def extract_contact_request(event: dict, new_user_message: str) -> ContactRequest:
     body = event.get('body')
     if body is None:
         raise ValueError("Missing Body from the ContactRequest")
@@ -70,6 +70,9 @@ def extract_contact_request(event: dict) -> ContactRequest:
             request_timestamp=datetime.datetime.fromtimestamp(
                 event.get("timestamp", 0) / 1_000
             ),
-            conversation_id=event.get("conversationId")
+            conversation_id=event.get("conversationId"),
+            is_new_user=event.get("message") == new_user_message
         )
 
+def is_message_removed_concact(message: dict) -> bool:
+    return message.get("text") == f"@{message.get('from')} removed you as a contact"
