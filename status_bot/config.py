@@ -19,6 +19,8 @@ class BackendConfig(BaseModel):
 
 class BotConfig(BaseModel):
     name: str = ""
+    bio: str = "Just a bot"
+    profil_picture_path: str = "assets/profile.jpg"
     public_key: str = ""
     password: str = ""
     mnemonic_phrase: str = ""

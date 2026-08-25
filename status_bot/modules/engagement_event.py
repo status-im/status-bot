@@ -37,10 +37,13 @@ class EngagementEvent(BaseModule):
             contacts = [contact["public_key"] for contact in
                         self.ctx.account.contacts.values() if contact["compressed_key"]
                         in group_chat_config.get("participants")]
-            logger.info(f"Contact to add {contacts}")
+            for c in contacts:
+                self.ctx.account.add_contact(c)
+            logger.info(f"Creating group with {contacts}")
             self.group_chat = GroupChat(self.ctx.account).create(
                     public_keys=contacts,
                     name=group_chat_config.get("name"))
+            logger.info(f"New Group {group_chat_config.get('name')} created: {self.group_chat.id}")
         else:
             logger.debug("Loading existing GroupChat")
             self.group_chat = GroupChat(
@@ -74,8 +77,6 @@ class EngagementEvent(BaseModule):
     """
     def is_support_message(self, message) -> bool:
         support_keywords = self.ctx.config.settings.get("support_keywords", [])
-        logger.info(f"Message Text {message.get('text')}")
-        logger.info([kw for kw in support_keywords if kw in message.get("text", "").lower()])
         return any(kw in message.get("text").lower() for kw in support_keywords)
 
     """
@@ -108,7 +109,7 @@ class EngagementEvent(BaseModule):
         self._counter.labels(type="valid-support-query").inc()
         logger.debug(f"Sending the request {support_message.id} to ChatGroup")
         group_message_id = self.group_chat.send_message(
-                self.ctx.config.settings.get("group_message_text"))
+                message=self.ctx.config.settings.get("group_message_text"))
         group_message_id = self.group_chat.send_message(message.get("text"))
         support_message.group_support_message_id = group_message_id
         db_session.merge(support_message)

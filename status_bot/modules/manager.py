@@ -109,7 +109,7 @@ class ModuleManager:
             module_config = ModuleConfig(
                 name=module_name,
                 enabled=True,
-                interval=module_settings.get("interval", 600),
+                interval=module_settings.get("interval", 60),
                 max_retries=module_settings.get("max_retries", 3),
                 backoff_seconds=module_settings.get("backoff_seconds", 30),
                 settings=module_settings,
@@ -207,7 +207,7 @@ class ModuleManager:
                     pass
 
     def _run_periodic(self, module: BaseModule) -> None:
-        interval = module.ctx.config.interval
+        interval = module.ctx.config.interval * 60
         while not self._stop_event.is_set():
             module.execute()
             self._stop_event.wait(interval)
