@@ -15,6 +15,10 @@ class ModuleType(Enum):
     SERVICE = "service"
 
 
+def _module_type_to_set(module_type: ModuleType) -> set[ModuleType]:
+    return {module_type}
+
+
 @dataclass
 class ModuleConfig:
     name: str
@@ -75,7 +79,7 @@ class BaseModule(ABC):
 
     @property
     @abstractmethod
-    def module_type(self) -> ModuleType:
+    def module_type(self) -> set[ModuleType]:
         ...
 
     @property

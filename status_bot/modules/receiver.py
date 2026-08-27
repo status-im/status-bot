@@ -67,8 +67,8 @@ def build_model_rows(
 class ReceiverModule(BaseModule):
 
     @property
-    def module_type(self) -> ModuleType:
-        return ModuleType.EVENT
+    def module_type(self) -> set[ModuleType]:
+        return {ModuleType.EVENT}
 
     def on_start(self):
         config = self.ctx.shared_state.get("config")

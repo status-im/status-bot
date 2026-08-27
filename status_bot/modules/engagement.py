@@ -1,20 +1,44 @@
 import logging
+from sqlalchemy import and_, or_
+from datetime import datetime, timedelta
+
 from prometheus_client import Counter
 from status_bot.constants import EventTypeEnum, NotificationCategoryEnum
 from status_bot.models import SupportMessage, ContactRequest
 from status_bot.modules.base import BaseModule, ModuleType
 from status_bot.modules.utils import extract_contact_request, is_message_removed_concact
 from status_sdk import GroupChat
+
 import json
 
 logger = logging.getLogger(__name__)
 
 MANDATORY_CONFIG_FIELD = [
+    # Events Config
     "first_messages", "support_keywords","helper_message", "automatic_reply", "group_chat",
-    "new_user_message_contact_request", "existing_users_messages"
+    "new_user_message_contact_request", "existing_users_messages",
+    # Periodic Config
+    "periodic_messages"
 ]
 
-class EngagementEvent(BaseModule):
+
+
+def get_all_contact_to_contact(db_session, delay, delay_unit):
+    threshold = datetime.now() - timedelta(days=delay)
+    if delay_unit != "days":
+        threshold = datetime.utcnow() - timedelta(minutes=delay)
+    logger.info(f"Threshold {threshold}")
+
+    return db_session.query(ContactRequest).filter(
+        and_(
+            ContactRequest.request_timestamp < threshold,
+            ContactRequest.last_engagement_message < delay,
+            ContactRequest.is_new_user
+        )
+    ).all()
+
+
+class Engagement(BaseModule):
 
     DESCRIPTION = """
         Module made for Engagmement in the Status App.
@@ -23,8 +47,8 @@ class EngagementEvent(BaseModule):
 
 
     @property
-    def module_type(self) -> ModuleType:
-        return ModuleType.EVENT
+    def module_type(self) -> set[ModuleType]:
+        return {ModuleType.EVENT}
 
     def on_start(self):
         logger.info("Starting module Engagement Bot")
@@ -51,8 +75,6 @@ class EngagementEvent(BaseModule):
                     chat_id=group_chat_config.get("group_id"))
         logger.info(f"THe bot will detect messages with the following keywords {self.ctx.config.settings.get('support_keywords', [])}")
 
-    def execute(self):
-        pass
 
     """
     Function to handle new Contact request from User
@@ -169,8 +191,32 @@ class EngagementEvent(BaseModule):
                 else:
                     self.handle_users_messages(message, db_session)
 
+    def execute(self):
+        if self.ctx.db is None:
+            return
+        logger.info("Executing module PeriodicEngagement")
+        planned_messages = self.ctx.config.settings.get("periodic_messages", [])
+        for planned_message in planned_messages:
+            _delay = planned_message.get("delay")
+            _message = planned_message.get("message")
+            logger.info(f"Looking for contact to send message with delay {_delay}")
+            with self.ctx.db.session() as session:
+                contacts = get_all_contact_to_contact(
+                    session, _delay,
+                    self.ctx.config.settings.get("delay_type", "days"))
+                logger.info(f"Found {len(contacts)} contacts to send a messages")
+                for c in contacts:
+                    self.ctx.account.send_message(chat_id=c.public_key, message=_message)
+                    c.last_engagement_message = _delay
+                    self._counter.labels(delay=_delay).inc()
+                session.commit()
 
     def register_metrics(self) -> None:
+        self._counter = Counter(
+            "status_bot_engagement_periodic",
+            "Total Message send by delay",
+            ["delay"]
+        )
         self._counter = Counter(
             "status_bot_engagement_actions",
             "Total Contact Request received",

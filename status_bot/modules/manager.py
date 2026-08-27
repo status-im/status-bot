@@ -128,7 +128,7 @@ class ModuleManager:
             try:
                 module = module_class(ctx)
                 self._modules[module_name] = module
-                if module.module_type == ModuleType.EVENT:
+                if ModuleType.EVENT in module.module_type:
                     self._event_modules[module_name] = module
                 logger.info(f"Loaded module: {module_name}")
             except Exception as e:
@@ -175,15 +175,15 @@ class ModuleManager:
                 module._running = True
                 module.on_start()
 
-                if module.module_type == ModuleType.PERIODIC:
+                if ModuleType.SERVICE in module.module_type:
+                    module.execute()
+                elif ModuleType.PERIODIC in module.module_type:
                     self._run_periodic(module)
-                elif module.module_type == ModuleType.EVENT:
+                elif ModuleType.EVENT in module.module_type:
                     # Event listening is centralized in the manager;
                     # wait until stop event is set
                     while not self._stop_event.is_set():
                         self._stop_event.wait(1)
-                elif module.module_type == ModuleType.SERVICE:
-                    module.execute()
 
                 break
 

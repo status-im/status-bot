@@ -21,8 +21,8 @@ class SendRequestCommunityRequest(BaseModel):
 class MessagingModule(BaseModule):
 
     @property
-    def module_type(self) -> ModuleType:
-        return ModuleType.SERVICE
+    def module_type(self) -> set[ModuleType]:
+        return {ModuleType.SERVICE}
 
     def on_start(self):
         app: FastAPI = self.ctx.shared_state["fastapi_app"]
