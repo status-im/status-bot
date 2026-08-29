@@ -27,7 +27,7 @@ api:
 
 modules:
     directories: []
-    enabled: ["messaging", "receiver", "community_monitoring"]
+    enabled: ["messaging", "receiver", "community_monitoring", "discourse_bridge"]
     settings:
         receiver:
             messages_table: "received_messages"
@@ -39,6 +39,19 @@ modules:
             communities:
                 - Status
                 - Logos
+        discourse_bridge:
+            category_name: "discuss.status.app"
+            delay: 5 # Seconds to wait between every sent Discourse message
+            emoji_shortname: ":white_check_mark:"
+            api:
+                key: ""
+                username: ""
+            content_type:
+                - 1 # Text
+            url:
+                discourse: "https://discuss.status.app"
+                community: "https://status.app/c/G4AAAGRgngMUmea2VZcKn0rXyYHD8aLfDhfKwgQjSfIcPp8kbltM_SnmM1mZYyCpzU0LaELQRRnrfDz_Hrf-8ojM-j3ffyYNTcn9sZZx3ef-eMLkNMx3M0M9zN705o8MzMadJCuatPRgUXUB#zQ3shqYasmP7ZHvAWvG1J9hG5XrH2qV7Xs3CFDu3mCRuuXrKk"
+
 metrics:
     enabled: true
     host: "0.0.0.0"
