@@ -28,6 +28,7 @@ docs = [
 
 community-monitoring = ["detoxify"]
 
+discourse = ["html-to-markdown==3.11.4"]
 [project.scripts]
 status-bot = "main:main"
 

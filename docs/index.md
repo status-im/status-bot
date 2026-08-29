@@ -1,6 +1,6 @@
 # Status Bot
 
-The Status Bot is a Python tool communicating with the Status-backend to automate some actions.
+The Status Bot is a Python tool communicating with [`status-im/status-go`](https://github.com/status-im/status-go) and [`status-im/status-python-sdk`](https://github.com/status-im/status-python-sdk) to automate some actions.
 
 ## Architecture
 
@@ -16,20 +16,18 @@ graph TB
         ALCHEMY[Alchemy]
     end
 
-   BOT --> BACKEND
+   BOT <--> |status-sdk| BACKEND
    BACKEND --> |coingecko_api_key| COINGECKO
    BACKEND --> |infura_token| INFURA
    BACKEND --> |alchemy_token| ALCHEMY
    BOT --> DB
 ```
 
-The Status Bot use [status-python-sdk](https://github.com/status-im/status-python-sdk) for the interraction with Status Backend.
+Status-Backend use external services:
 
-The Status-Backend use external services:
-
-* CoinGecko - Optional to get token price
-* EVM access - Required to interract with Token Gated community. Only Infura EVM works.
-* Alchemy - Optional to get account transactions 
+- **CoinGecko** - Optional to get token price
+- **EVM access** - Required to interract with Token Gated community. Only Infura EVM works.
+- **Alchemy** - Optional to get account transactions 
 
 ## Account Setup
 
@@ -50,10 +48,4 @@ bot:
     alchemy_token: 'Your Alchemy token'
 ```
 
-### Importing Status Account
-
-The account can also be imported from the Status Application. It first need to export a backup, then import it in the docker container under `/backups`.
-
-> Note: the account backup need to also be imported in Status Backend
-
-The full configuration explaination can be found in the [configuration](deployment/configuration.md) page.
+Existing `.bkp` files can be imported in the docker container under `/backups`. The full configuration explaination can be found in the [configuration](deployment/configuration.md) page.
