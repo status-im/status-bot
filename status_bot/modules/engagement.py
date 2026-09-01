@@ -1,27 +1,34 @@
 import logging
+
+from typing import Optional
 from sqlalchemy import and_, or_
 from datetime import datetime, timedelta
-
 from prometheus_client import Counter
-from status_bot.constants import EventTypeEnum, NotificationCategoryEnum
-from status_bot.models import SupportMessage, ContactRequest
-from status_bot.modules.base import BaseModule, ModuleType
-from status_bot.modules.utils import extract_contact_request, is_message_removed_concact
-from status_sdk import GroupChat
 
-import json
+from status_bot.constants import EventTypeEnum, NotificationCategoryEnum
+from status_bot.models import FeedbackMessage, ContactRequest
+from status_bot.modules.base import BaseModule, ModuleType
+from status_bot.modules.utils import download_image, extract_contact_request, download_image
+from status_bot.exceptions import ImageDownloadFailedException
+from status_sdk import GroupChat
 
 logger = logging.getLogger(__name__)
 
 MANDATORY_CONFIG_FIELD = [
     # Events Config
-    "first_messages", "support_keywords","helper_message", "automatic_reply", "group_chat",
-    "new_user_message_contact_request", "existing_users_messages",
+    "first_messages", "feedback_keywords","helper_message", "automatic_reply", "group_chat",
+    "new_user_message_contact_request", "existing_users_messages", "image_folder",
     # Periodic Config
     "periodic_messages"
 ]
 
+REPLY_MSG_ERROR_IMG = "\nAn image was sent, but an error occured during the download"
 
+IGNORED_MSG_CONTENT_TYPE = [
+    11, # Contact request
+    15, # Send contact request
+    17  # Removed Contact
+]
 
 def get_all_contact_to_contact(db_session, delay, delay_unit):
     threshold = datetime.now() - timedelta(days=delay)
@@ -37,6 +44,19 @@ def get_all_contact_to_contact(db_session, delay, delay_unit):
         )
     ).all()
 
+def get_response_reply_if_exist(db_session, messages) -> Optional[str]:
+    msg_response_to = next(
+       (msg["responseTo"] for msg in messages if "responseTo" in msg),
+        None
+    )
+    if msg_response_to:
+        logger.debug(f"replying to message {msg_response_to}")
+        reply_to = db_session.query(FeedbackMessage).filter(FeedbackMessage.reply_chat_id==msg_response_to).first()
+        logger.debug(f"Original Message here {reply_to}")
+        if reply_to:
+            return reply_to.reply_chat_id
+
+    return None
 
 class Engagement(BaseModule):
 
@@ -45,10 +65,9 @@ class Engagement(BaseModule):
         It accept all the friend request and send welcome message
     """
 
-
     @property
     def module_type(self) -> set[ModuleType]:
-        return {ModuleType.EVENT}
+        return {ModuleType.EVENT, ModuleType.PERIODIC}
 
     def on_start(self):
         logger.info("Starting module Engagement Bot")
@@ -73,11 +92,13 @@ class Engagement(BaseModule):
             self.group_chat = GroupChat(
                     account=self.ctx.account,
                     chat_id=group_chat_config.get("group_id"))
-        logger.info(f"THe bot will detect messages with the following keywords {self.ctx.config.settings.get('support_keywords', [])}")
+        logger.info(f"The bot will detect messages with the following keywords {self.ctx.config.settings.get('feedback_keywords', [])}")
 
 
     """
-    Function to handle new Contact request from User
+    Function to handle new contact request.
+
+    Parameters
     """
     def hanlde_contact_request(self, event_data: dict, db_session):
         new_contact: ContactRequest = extract_contact_request(
@@ -98,78 +119,150 @@ class Engagement(BaseModule):
                 message=msg)
         self._counter.labels(type=message_properties).inc()
 
-    """
-        Verify if the message concerne the support or is concidered spam
-    """
-    def is_support_message(self, message) -> bool:
-        support_keywords = self.ctx.config.settings.get("support_keywords", [])
-        return any(kw in message.get("text").lower() for kw in support_keywords)
+
+
+    def extract_user_messages(self, messages: list[dict], ) -> list[dict]:
+        """
+            This function take the raw messages from the signal and remove the messages from
+            the bot account.
+            This help to remove reply content.
+
+            Parameters:
+                - messages: list of messages from the raw signals
+                - bot_compressed_key key
+
+            Output:
+                - List of messages from the user
+        """
+        clean_msg_list = []
+        for msg in messages:
+            if msg.get("compressedKey") == self.ctx.account.info["compressed_key"]:
+                continue
+            if msg.get("text") == self.ctx.config.settings.get("new_user_message_contact_request"):
+                continue
+            if msg.get("contentType") in IGNORED_MSG_CONTENT_TYPE:
+                continue
+            clean_msg_list.append(msg)
+
+        return clean_msg_list
 
     """
-        Manage message sent to the Bot
+        Verify if the message concerne the feedback or is concidered spam.
+        Use only the first message since multiple messages are image album
+        and sahre the same text.
     """
-    def handle_users_messages(self, message: dict, db_session):
-        user_public_key = message.get("from")
-        if not self.is_support_message(message):
-            logger.info("Not matching the support keywords")
+    def is_feedback_message(self, messages) -> bool:
+        feedback_keywords = self.ctx.config.settings.get("feedback_keywords", [])
+        return any(kw in messages[0].get("text").lower() for kw in feedback_keywords)
+
+    def send_message(self, chat_id: str, orignal_message: dict, msg_content: str, reply_id: Optional[str]):
+        send_msg_id=None
+        if orignal_message.get("image"):
+            try:
+                image_path=f"{self.ctx.config.settings.get('image_folder')}/{orignal_message.get('id')}"
+                download_image(
+                    url=orignal_message.get("image", "").replace('localhost', 'backend'),
+                    image_path=image_path)
+                send_msg_id = self.ctx.account.send_image(
+                        chat_id=chat_id,
+                        file_path=image_path,
+                        message=msg_content,
+                        reply_to_message_id=reply_id)
+            except ImageDownloadFailedException as e:
+                logger.error(e)
+                send_msg_id = self.ctx.account.send_message(
+                    chat_id=chat_id,
+                    message=f"{msg_content} {REPLY_MSG_ERROR_IMG}",
+                    reply_to_message_id=reply_id
+                )
+        else:
+            send_msg_id = self.ctx.account.send_message(
+                chat_id=chat_id,
+                message=msg_content,
+                reply_to_message_id=reply_id)
+
+        return send_msg_id
+
+
+    """
+        Manage message sent to the Bot by a User
+    """
+    def handle_users_messages(self, messages: list[dict], db_session):
+        user_public_key = messages[0].get("from")
+        message_id = messages[0].get("id")
+        reply_id = get_response_reply_if_exist(db_session, messages)
+        if not self.is_feedback_message(messages) and not reply_id:
+            logger.info("Not matching the feedback keywords")
             self.ctx.account.send_message(
                 chat_id=user_public_key,
                 message=self.ctx.config.settings.get("helper_message"),
-                reply_to_message_id=message.get("id"))
-            self._counter.labels(type="invalid-support-query").inc()
+                reply_to_message_id=message_id)
+            self._counter.labels(type="invalid-feedback-query").inc()
             return
 
-        logger.info(f"A new support message has been received from {user_public_key}")
-        support_message: SupportMessage = SupportMessage(
-            id=message.get("id"),
-            public_key=message.get("from"),
-            request_message=message.get("text"),
-            request_timestamp=message.get("timestamp"),
-            chat_id=message.get("chatId"))
-        db_session.merge(support_message)
-        db_session.commit()
+        logger.info(f"A new feedback message has been received from {user_public_key}")
         self.ctx.account.send_message(
                 chat_id=user_public_key,
                 message=self.ctx.config.settings.get("automatic_reply"),
-                reply_to_message_id=message.get("id"))
-        self._counter.labels(type="valid-support-query").inc()
-        logger.debug(f"Sending the request {support_message.id} to ChatGroup")
-        group_message_id = self.group_chat.send_message(
-                message=self.ctx.config.settings.get("group_message_text"))
-        group_message_id = self.group_chat.send_message(message.get("text"))
-        support_message.group_support_message_id = group_message_id
-        db_session.merge(support_message)
-        db_session.commit()
+                reply_to_message_id=message_id)
+        self._counter.labels(type="valid-feedback-query").inc()
+
+
+        first_msg = True
+        for msg in messages:
+            request_text = msg.get("text", "")
+            if not first_msg:
+                # If the message is another photo of the album we don't send the text again
+                request_text = ""
+            if first_msg and not reply_id:
+                # sending the config message only for the first message of a feedback
+                # request, not for reply or for other photos
+                self.group_chat.send_message(
+                    message=self.ctx.config.settings.get("group_message_text"))
+
+            msg_id = self.send_message(self.group_chat.id, msg, request_text, reply_id)
+
+            feedback_message: FeedbackMessage = FeedbackMessage(
+                id=message_id,
+                public_key=user_public_key,
+                request_message=messages[0].get("text"),
+                request_timestamp=messages[0].get("timestamp"),
+                chat_id=messages[0].get("chatId"),
+                group_chat_message_id=msg_id)
+            logger.debug(f"Sending the request {feedback_message.id} to ChatGroup")
+
+            db_session.merge(feedback_message)
+            db_session.commit()
         self._counter.labels(type="request-transfered").inc()
 
-
-
     """
-        Manage messages sent by a support GroupChat to be transfert to the users
+        Manage messages sent by the GroupChat to be transfert to the users
     """
-    def find_reply(self, message: dict, db_session):
-        responseTo = message.get("responseTo")
+    def find_reply(self, messages: list[dict], db_session):
+        responseTo = messages[0].get("responseTo")
         if responseTo is None or responseTo == "":
             logger.debug("The message isn't a reply, ignoring it")
             return
-        orginal_message: SupportMessage = db_session.query(SupportMessage).filter(SupportMessage.group_support_message_id==responseTo).first()
-        if orginal_message == None:
+        original_message: FeedbackMessage = db_session.query(FeedbackMessage).filter(FeedbackMessage.group_chat_message_id==responseTo).first()
+        if original_message == None:
             logger.warning(f"No original message found for id {responseTo}")
             self._counter.labels(type="original-not-found").inc()
             return
-        # If so, check if it match a SupportMessage.group_support_message_id in db
-        logger.debug(f"Sending reply to message {orginal_message.id}")
-        reply_content = message.get("text")
-        self.ctx.account.send_message(
-                chat_id=orginal_message.public_key,
-                message=reply_content,
-                reply_to_message_id=orginal_message.id)
+        logger.debug(f"Sending reply to message {original_message.id}")
+        reply_content = messages[0].get("text", "")
+        reply_id: str = ""
+        for msg in messages:
+            reply_id = self.send_message(
+                original_message.public_key,
+                msg,
+                reply_content,
+                original_message.id)
         self._counter.labels(type="sent-reply").inc()
-        orginal_message.response_message = reply_content
-        orginal_message.response_timestamp = message.get("timestamp")
-        db_session.merge(orginal_message)
+        original_message.response_message = reply_content
+        original_message.response_timestamp = messages[0].get("timestamp")
+        original_message.reply_chat_id = reply_id
+        db_session.merge(original_message)
         db_session.commit()
-
 
     def on_event(self, event_type: str, event: dict):
         with self.ctx.db.session() as db_session:
@@ -181,15 +274,19 @@ class Engagement(BaseModule):
                 self.hanlde_contact_request(event_data, db_session)
                 return
             if event_type == EventTypeEnum.MESSAGE.value and event_data.get("messages") is not None:
-                message = event_data.get("messages",[])[0]
-                if message is None:
+                messages = event_data.get("messages")
+
+                if messages is None or len(messages) == 0:
                     raise ValueError("No message in the event")
-                if is_message_removed_concact(message):
+
+                clean_msg_list = self.extract_user_messages(messages)
+                if len(clean_msg_list) == 0:
+                    logger.warning("No message from a user in the signal")
                     return
                 if event_data.get("chats")[0].get("id") == self.group_chat.id:
-                    self.find_reply(message, db_session)
+                    self.find_reply(clean_msg_list, db_session)
                 else:
-                    self.handle_users_messages(message, db_session)
+                    self.handle_users_messages(clean_msg_list, db_session)
 
     def execute(self):
         if self.ctx.db is None:
@@ -208,11 +305,11 @@ class Engagement(BaseModule):
                 for c in contacts:
                     self.ctx.account.send_message(chat_id=c.public_key, message=_message)
                     c.last_engagement_message = _delay
-                    self._counter.labels(delay=_delay).inc()
+                    self._peridic_counter.labels(delay=_delay).inc()
                 session.commit()
 
     def register_metrics(self) -> None:
-        self._counter = Counter(
+        self._peridic_counter = Counter(
             "status_bot_engagement_periodic",
             "Total Message send by delay",
             ["delay"]

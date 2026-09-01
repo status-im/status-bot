@@ -29,7 +29,7 @@ def create_bot(config: Config, project_root: str) -> Account:
 
     if account.info["compressed_key"] != config.bot.chat_key:
         raise Exception(
-            "Target compressed key and logged in compressed key are different."
+            "Target compressed key and logged in chat key are different."
         )
 
     account.bio = config.bot.bio
