@@ -5,10 +5,14 @@ import os
 import pickle
 import re
 from hashlib import sha256
-import json
 import pandas as pd
-from typing import Any
+from typing import Any, Optional
+import requests
 
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
+
+from status_bot.exceptions import ImageDownloadFailedException
 from status_bot.models import ContactRequest
 
 logger = logging.getLogger(__name__)
@@ -62,23 +66,47 @@ def save_file(file_path: str, data: Any):
         pickle.dump(data, f)
 
 
-def extract_contact_request(event: dict, new_user_message: str) -> ContactRequest:
-    body = event.get('body')
-    if body is None:
-        raise ValueError("Missing Body from the ContactRequest")
-    contact_event = body.get("contact")
-    if contact_event is None:
-        raise ValueError("Missing contact part from the ContactRequest")
-    return ContactRequest(
-            id=body.get("message").get("id"),
-            public_key=contact_event.get("id"),
-            request_message=event.get("message"),
-            request_timestamp=datetime.datetime.fromtimestamp(
-                event.get("timestamp", 0) / 1_000
-            ),
-            conversation_id=event.get("conversationId"),
-            is_new_user=event.get("message") == new_user_message
-        )
+def download_image(url: str, image_path: str):
+    session = requests.Session()
+    session.trust_env = False  # Avoid proxy conflicts
 
-def is_message_removed_concact(message: dict) -> bool:
-    return message.get("text") == f"@{message.get('from')} removed you as a contact"
+    # Configure retry logic for transient 503 errors
+    retries = Retry(total=3, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
+    session.mount('https://', HTTPAdapter(max_retries=retries))
+    try:
+        logger.debug(f"Image URL {url}")
+        response = session.get(url, verify=False, stream=True, timeout=10)
+        logger.debug("Starting the download")
+        with open(image_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+                else:
+                    logger.info("No chunk")
+        logger.debug(f"Image successfully downloaded to {image_path}")
+
+        response.raise_for_status()  # Raise an exception for HTTP errors
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error downloading image: {e}")
+        raise ImageDownloadFailedException(f"Failed to download image from {url}")
+
+
+def is_group_chat_message(event_data: dict, chat_id: Optional[str] = None)-> bool:
+    """
+    Determind if the message is from a group chat
+    Parameters:
+        - event_data: entire event data
+        - chat_id: Optional id of a chat to compare
+    Output:
+        - boolean indiciating if the message is from a ChatGroup and if it has the same chat_id
+    """
+    chats = event_data.get("chats", [])
+    if len(chats) == 0:
+        return False
+    if chats[0].get("chatType") != 3 :
+        return False
+    if not chat_id:
+        return True
+    if chats[0].get("id") == chat_id:
+        return True
+    return False
