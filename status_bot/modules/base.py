@@ -6,11 +6,17 @@ from status_sdk import Account
 from status_bot import Database
 import threading, logging
 
+from prometheus_client import Counter, Gauge
+
 
 class ModuleType(Enum):
     PERIODIC = "periodic"
     EVENT = "event"
     SERVICE = "service"
+
+
+def _module_type_to_set(module_type: ModuleType) -> set[ModuleType]:
+    return {module_type}
 
 
 @dataclass
@@ -48,7 +54,7 @@ class BaseModule(ABC):
         self.__account = self.ctx.account
 
     @property
-    def seconds_interval(self) -> int:
+    def interval(self) -> int:
         return self.__interval
 
     @property
@@ -73,7 +79,7 @@ class BaseModule(ABC):
 
     @property
     @abstractmethod
-    def module_type(self) -> ModuleType:
+    def module_type(self) -> set[ModuleType]:
         ...
 
     @property
@@ -90,8 +96,26 @@ class BaseModule(ABC):
     def on_stop(self) -> None:
         pass
 
-    def on_event(self, event: dict) -> Any:
+    def on_event(self, event_type: str, event: dict) -> Any:
         return None
+
+    def register_metrics(self) -> None:
+        """Override in subclasses to register custom Prometheus metrics.
+
+        Metrics registered here will be exposed alongside the built-in bot metrics.
+        The module name will be automatically added as a label to all registered metrics.
+        """
+        pass
+
+    def _verify_mandatory_config(self, config_fields: list[str]):
+        missing_field = []
+        for field in config_fields:
+            if self.ctx.config.settings.get(field) is None:
+                missing_field.append(field)
+        if len(missing_field) > 0:
+            raise ValueError(
+                    f"Missing fields in the config module: {', '.join(missing_field)}")
+
 
     @property
     def is_running(self) -> bool:

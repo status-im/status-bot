@@ -23,8 +23,8 @@ UVICORN_LOG_CONFIG = {
 class APIServerModule(BaseModule):
 
     @property
-    def module_type(self) -> ModuleType:
-        return ModuleType.SERVICE
+    def module_type(self) -> set[ModuleType]:
+        return {ModuleType.SERVICE}
 
     def on_start(self):
         api_config = self.ctx.shared_state["config"].api

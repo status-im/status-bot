@@ -25,10 +25,14 @@ def start_prometheus(metrics_config: MetricsConfig, manager: ModuleManager):
     )
 
     health.set(1)
-    version.labels(version="0.1.0").set(1)
+    version.labels(version="1.0.0").set(1)
 
     for module_name in manager.module_names:
         module_loaded.labels(module=module_name).set(1)
+
+    for module_name in manager.module_names:
+        module = manager.modules[module_name]
+        module.register_metrics()
 
     host = metrics_config.host
     port = metrics_config.port

@@ -41,8 +41,8 @@ class CommunitiesMonitoring(BaseModule):
     }
 
     @property
-    def module_type(self) -> ModuleType:
-        return ModuleType.PERIODIC
+    def module_type(self) -> set[ModuleType]:
+        return {ModuleType.PERIODIC}
 
     def on_start(self):
         try:

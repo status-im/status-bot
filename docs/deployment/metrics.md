@@ -16,7 +16,7 @@ Configured via the `metrics` section in `config.yaml` (see [Configuration](./con
 
 ---
 
-## Available metrics
+## Basic metrics
 
 ### `status_bot_health`
 
@@ -55,6 +55,44 @@ status_bot_module_loaded{module="api_server"} 1
 | Counter | `module` | Total number of times a module has been restarted |
 
 ---
+
+## Adding metrics to modules
+
+The start_prometheus() function in status_bot/metrics.py automatically calls module.register_metrics() for each loaded module after setting up the built-in metrics.
+
+```python
+from prometheus_client import Counter, Gauge
+from status_bot.modules.base import BaseModule, ModuleType
+
+class MyModule(BaseModule):
+
+    @property
+    def module_type(self) -> ModuleType:
+        return ModuleType.PERIODIC
+
+    def register_metrics(self) -> None:
+        # Register a counter with module name as label
+        self._processed = Counter(
+            "my_module_messages_processed_total",
+            "Total messages processed by my module",
+            ["module"]
+        )
+        # Store label-ref for incrementing
+        self._counter = self._processed.labels(module=self.name)
+        # You can also register gauges, histograms, etc.
+        self._status = Gauge(
+            "my_module_status",
+            "Current status of my module",
+            ["module"]
+        )
+        self._status.labels(module=self.name).set(0)
+
+    def execute(self):
+        # module logic...
+        self._counter.inc() # increment after processing
+        self._status.labels(module=self.name).set(1) # update gauge
+
+```
 
 ## Example Prometheus scrape config
 

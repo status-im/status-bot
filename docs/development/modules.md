@@ -4,23 +4,28 @@ Modules extend the bot with custom logic. Each module runs in its own daemon thr
 
 ## Module types
 
-| Type | Behaviour | Use case |
-|------|-----------|----------|
-| `PERIODIC` | Calls `execute()` in a loop, sleeping `interval` seconds between runs | Scheduled data extraction, polling |
-| `EVENT` | Iterates over WebSocket signal events, calling `on_event()` for each one | Real-time message reactions, auto-reply |
-| `SERVICE` | Calls `execute()` once. Expected to block until shutdown (e.g. runs a server) | HTTP API server, long-running workers |
+Modules can declare one or more types. The behavior is composed from the declared types:
 
+| Type | Behaviour |
+|------|-----------|
+| `PERIODIC` | Calls `execute()` in a loop, sleeping `interval` seconds between runs |
+| `EVENT` | Receives WebSocket signal events via `on_event()` (centralized listener) |
+| `SERVICE` | Calls `execute()` once. Expected to block until shutdown |
+
+**Combination examples:**
+- `PERIODIC | EVENT`: Runs `execute()` periodically and receives signal events
+- `EVENT | SERVICE`: Listens to events while running a blocking service
 
 ## BaseModule API
 
 ```python
 from status_bot.modules.base import BaseModule, ModuleType
 
-class MyModule(BaseModule):
+class MyModule:
 
     @property
-    def module_type(self) -> ModuleType:
-        return ModuleType.PERIODIC
+    def module_type(self) -> set[ModuleType]:
+        return {ModuleType.PERIODIC}
 
     def on_start(self):
         ...  # called once when the module starts
@@ -36,9 +41,9 @@ class MyModule(BaseModule):
 ```
 ### Properties
 
-#### `seconds_interval`
+#### `interval`
 
-Number of seconds to wait between every `ModuleType.PERIODIC` run. This value can be set within `modules > settings`.
+Number of minutes to wait between every `ModuleType.PERIODIC` run. This value can be set within the module config `modules.settings.$module_name.interval`.
 
 #### `db_schema`
 
@@ -107,14 +112,14 @@ The `api_server` module is auto-loaded whenever any API module is enabled and `a
 
 ## Signals and EVENT modules
 
-EVENT modules react to Status WebSocket signals:
+Modules declaring `ModuleType.EVENT` in their `module_type` set receive WebSocket signal events via `on_event()`. The centralized signal listener delivers events to all such modules.
 
 ```python
 class AutoReplyModule(BaseModule):
 
     @property
-    def module_type(self) -> ModuleType:
-        return ModuleType.EVENT
+    def module_type(self) -> set[ModuleType]:
+        return {ModuleType.EVENT}
 
     def on_start(self):
         self._commands = self.ctx.config.settings.get("commands", {})
@@ -125,7 +130,7 @@ class AutoReplyModule(BaseModule):
             self.ctx.account.send_message(msg["chatId"], "Message received")
 ```
 
-The signal listener respects `stop_event` for graceful shutdown.
+A module can declare `EVENT` alongside other types (e.g., `PERIODIC | EVENT`). In that case, it both receives signal events and has its `execute()` called periodically. The signal listener respects `stop_event` for graceful shutdown.
 
 
 ## Utility functions

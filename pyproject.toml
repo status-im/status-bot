@@ -1,6 +1,6 @@
 [project]
 name = "status-bot"
-version = "0.2.0"
+version = "1.0.0-RC1"
 description = "A modular bot for Status App that automates tasks, responds to commands, and integrates with APIs."
 requires-python = ">=3.12"
 license-files = ["LICENSE.md"]
@@ -14,7 +14,7 @@ dependencies = [
     "psycopg2-binary",
     "sqlalchemy",
     "prometheus-client",
-    "status-sdk>=1.1.0",
+    "status-sdk @ git+https://github.com/status-im/status-python-sdk.git@aa216d3ff196196bf43e1e3db15d66c82183230d",
     "pyyaml",
     "pandas",
 ]
