@@ -77,11 +77,9 @@ def extract_contact_request(event: dict, new_user_message: str) -> ContactReques
     return ContactRequest(
             id=body.get("message").get("id"),
             public_key=contact_event.get("id"),
-            request_message=event.get("message"),
             request_timestamp=datetime.datetime.fromtimestamp(
                 event.get("timestamp", 0) / 1_000
             ),
-            conversation_id=event.get("conversationId"),
             is_new_user=event.get("message") == new_user_message
         )
 

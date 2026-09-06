@@ -170,6 +170,7 @@ class Engagement(BaseModule):
                         reply_to_message_id=reply_id)
             except ImageDownloadFailedException as e:
                 logger.error(e)
+                self._counter(type="error-image-download").inc()
                 send_msg_id = self.ctx.account.send_message(
                     chat_id=chat_id,
                     message=f"{msg_content} {REPLY_MSG_ERROR_IMG}",
@@ -225,8 +226,6 @@ class Engagement(BaseModule):
             feedback_message: FeedbackMessage = FeedbackMessage(
                 id=message_id,
                 public_key=user_public_key,
-                request_message=messages[0].get("text"),
-                request_timestamp=messages[0].get("timestamp"),
                 chat_id=messages[0].get("chatId"),
                 group_chat_message_id=msg_id)
             logger.debug(f"Sending the request {feedback_message.id} to ChatGroup")

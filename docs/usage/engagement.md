@@ -78,9 +78,6 @@ This module store in the database the following object.
 |-----------|----------|--------------|----------------|
 | `id` | `String` | ❌ | Unique identifier for the feedback message (matches the original message ID from the Status App). |
 | `public_key` | `String` | ❌ | Public key of the **user** who sent the feedback request. |
-| `request_message` | `String` | ✅ | The **content** of the user's feedback request. |
-| `request_timestamp` | `BigInteger` | ✅ | Timestamp (Unix epoch) when the user sent the request. |
-| `chat_id` | `String` | ✅ | ID of the **chat** where the request was sent. |
 | `group_chat_message_id` | `String` | ✅ | ID of the message in the **feedback group chat** where the request was forwarded. |
 | `response_timestamp` | `BigInteger` | ✅ | Timestamp (Unix epoch) when the Status Team **replied** to the request. |
 | `response_message` | `String` | ✅ | The **content** of the Status Team's reply. |
@@ -100,9 +97,7 @@ This module store in the database the following object.
 |-----------|----------|--------------|----------------|
 | `id` | `String` | ❌ | Unique identifier for the contact request. |
 | `public_key` | `String` | ❌ | Public key of the **user** who sent the contact request. |
-| `request_message` | `String` | ✅ | The **message** sent by the user when requesting contact. |
 | `request_timestamp` | `DateTime` | ❌ | Timestamp when the contact request was **received**. |
-| `conversation_id` | `String` | ✅ | ID of the **conversation** where the request was made. |
 | `last_engagement_message` | `Float` | ✅ | Timestamp of the **last engagement message** sent to the user (used for periodic follow-ups). |
 | `is_new_user` | `Boolean` | ✅ | Flag indicating whether the user is **new** (`True`) or **existing** (`False`). |
 
@@ -125,6 +120,7 @@ It has different label based on the types of actions done:
 - `request-transfered` – Feedback request forwarded to the group chat.
 - `original-not-found` – Reply failed (original message not found in DB).
 - `sent-reply` – Reply successfully sent from the group chat to user.
+- `error-image-download` - An error happened during a image download
 
 #### `status_bot_engagement_periodic`
 
