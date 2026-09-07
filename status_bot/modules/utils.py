@@ -5,9 +5,8 @@ import os
 import pickle
 import re
 from hashlib import sha256
-import json
 import pandas as pd
-from typing import Any
+from typing import Any, Optional
 import requests
 
 from requests.adapters import HTTPAdapter
@@ -105,3 +104,28 @@ def download_image(url: str, image_path):
         logger.error(f"Error downloading image: {e}")
         raise ImageDownloadFailedException(f"Failed to download image from {url}")
 
+
+def is_group_chat_message(event_data: dict, chat_id: Optional[str] = None)-> bool:
+    """
+    Determind if the message is from a group chat
+    Parameters:
+        - event_data: entire event data
+        - chat_id: Optional id of a chat to compare
+    Output:
+        - boolean indiciating if the message is from a ChatGroup and if it has the same chat_id
+    """
+    chats = event_data.get("chats", [])
+    if len(chats) == 0:
+        logger.info("No Chats in event data")
+        return False
+    if chats[0].get("chatType") != 3 :
+        logger.info("message type not matching group")
+        logger.info(f"message type: {chats[0].get('messageType')} - {chats[0].get('chatType')} ")
+        return False
+    if not chat_id:
+        logger.info(f"{chat_id} - message type: {chats[0].get('messageType')}")
+        return True
+    if chats[0].get("id") == chat_id:
+        logger.info("Chat id matching group chat id")
+        return True
+    return False

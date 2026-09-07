@@ -1,16 +1,20 @@
 import logging
 
 from typing import Optional
-from sqlalchemy import and_, or_
 from datetime import datetime, timedelta
 from prometheus_client import Counter
+
+from sqlalchemy import and_, or_
+from sqlalchemy.orm import Session
 
 from status_bot.constants import EventTypeEnum, NotificationCategoryEnum
 from status_bot.models import FeedbackMessage, ContactRequest
 from status_bot.modules.base import BaseModule, ModuleType
-from status_bot.modules.utils import download_image, extract_contact_request, download_image
+from status_bot.modules.utils import download_image, extract_contact_request, download_image, is_group_chat_message
 from status_bot.exceptions import ImageDownloadFailedException
 from status_sdk import GroupChat
+
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +34,7 @@ IGNORED_MSG_CONTENT_TYPE = [
     17  # Removed Contact
 ]
 
-def get_all_contact_to_contact(db_session, delay, delay_unit):
+def get_all_contact_to_contact(db_session: Session, delay: int, delay_unit: str):
     threshold = datetime.now() - timedelta(days=delay)
     if delay_unit != "days":
         threshold = datetime.utcnow() - timedelta(minutes=delay)
@@ -44,7 +48,7 @@ def get_all_contact_to_contact(db_session, delay, delay_unit):
         )
     ).all()
 
-def get_response_reply_if_exist(db_session, messages) -> Optional[str]:
+def get_response_reply_if_exist(db_session: Session, messages: list[dict]) -> Optional[str]:
     msg_response_to = next(
        (msg["responseTo"] for msg in messages if "responseTo" in msg),
         None
@@ -74,38 +78,42 @@ class Engagement(BaseModule):
         self._verify_mandatory_config(MANDATORY_CONFIG_FIELD)
         if self.ctx.db is None:
             raise ConnectionError("Database connection not setup")
-        group_chat_config=self.ctx.config.settings.get("group_chat", {})
+        group_chat_config=self.settings.get("group_chat", {})
         if not group_chat_config.get("group_id"):
             logger.debug("Initializing new GroupChat")
             contacts = [contact["public_key"] for contact in
-                        self.ctx.account.contacts.values() if contact["compressed_key"]
+                        self.account.contacts.values() if contact["compressed_key"]
                         in group_chat_config.get("participants")]
             for c in contacts:
-                self.ctx.account.add_contact(c)
+                self.account.add_contact(c)
             logger.info(f"Creating group with {contacts}")
-            self.group_chat = GroupChat(self.ctx.account).create(
+            self.group_chat = GroupChat(self.account).create(
                     public_keys=contacts,
                     name=group_chat_config.get("name"))
             logger.info(f"New Group {group_chat_config.get('name')} created: {self.group_chat.id}")
         else:
-            logger.debug("Loading existing GroupChat")
+            logger.info("Loading existing GroupChat")
             self.group_chat = GroupChat(
-                    account=self.ctx.account,
+                    account=self.account,
                     chat_id=group_chat_config.get("group_id"))
-        logger.info(f"The bot will detect messages with the following keywords {self.ctx.config.settings.get('feedback_keywords', [])}")
+        logger.info(f"The bot will detect messages with the following keywords {self.settings.get('feedback_keywords', [])}")
 
 
-    """
-    Function to handle new contact request.
 
-    Parameters
-    """
-    def hanlde_contact_request(self, event_data: dict, db_session):
+    def handle_contact_request(self, event_data: dict, db_session: Session):
+        """
+        Function to handle new contact request.
+        It accept all contact request, save the contact in the database
+        Send the messages to the user based on `first_messages`.
+        Parameters:
+            - event_data: event content transmitted by the Backend
+            - session: ORM database session
+        """
         new_contact: ContactRequest = extract_contact_request(
-                event_data, self.ctx.config.settings.get("new_user_message_contact_request", ""))
+                event_data, self.settings.get("new_user_message_contact_request", ""))
         self._counter.labels(type="received_request").inc()
         logger.info(f"Accepting the contact request from {new_contact.public_key}")
-        self.ctx.account.add_contact(new_contact.public_key)
+        self.account.add_contact(new_contact.public_key)
         db_session.merge(new_contact)
         db_session.commit()
         self._counter.labels(type="accepted_request").inc()
@@ -113,15 +121,15 @@ class Engagement(BaseModule):
         message_properties = "existing_users_messages"
         if new_contact.is_new_user:
             message_properties = "first_messages"
-        for msg in self.ctx.config.settings.get(message_properties, []):
-            self.ctx.account.send_message(
+        for msg in self.settings.get(message_properties, []):
+            self.account.send_message(
                 chat_id=new_contact.public_key,
                 message=msg)
         self._counter.labels(type=message_properties).inc()
 
 
 
-    def extract_user_messages(self, messages: list[dict], ) -> list[dict]:
+    def extract_user_messages(self, messages: list[dict]) -> list[dict]:
         """
             This function take the raw messages from the signal and remove the messages from
             the bot account.
@@ -136,9 +144,9 @@ class Engagement(BaseModule):
         """
         clean_msg_list = []
         for msg in messages:
-            if msg.get("compressedKey") == self.ctx.account.info["compressed_key"]:
+            if msg.get("compressedKey") == self.account.info["compressed_key"]:
                 continue
-            if msg.get("text") == self.ctx.config.settings.get("new_user_message_contact_request"):
+            if msg.get("text") == self.settings.get("new_user_message_contact_request"):
                 continue
             if msg.get("contentType") in IGNORED_MSG_CONTENT_TYPE:
                 continue
@@ -146,24 +154,25 @@ class Engagement(BaseModule):
 
         return clean_msg_list
 
-    """
-        Verify if the message concerne the feedback or is concidered spam.
-        Use only the first message since multiple messages are image album
-        and sahre the same text.
-    """
-    def is_feedback_message(self, messages) -> bool:
-        feedback_keywords = self.ctx.config.settings.get("feedback_keywords", [])
+
+    def is_feedback_message(self, messages: list[dict]) -> bool:
+        """
+            Verify if the message concerne the feedback or is concidered spam.
+            Use only the first message since multiple messages are image album
+            and sahre the same text.
+        """
+        feedback_keywords = self.settings.get("feedback_keywords", [])
         return any(kw in messages[0].get("text").lower() for kw in feedback_keywords)
 
     def send_message(self, chat_id: str, orignal_message: dict, msg_content: str, reply_id: Optional[str]):
         send_msg_id=None
         if orignal_message.get("image"):
             try:
-                image_path=f"{self.ctx.config.settings.get('image_folder')}/{orignal_message.get('id')}"
+                image_path=f"{self.settings.get('image_folder')}/{orignal_message.get('id')}"
                 download_image(
                     url=orignal_message.get("image", "").replace('localhost', 'backend'),
                     image_path=image_path)
-                send_msg_id = self.ctx.account.send_image(
+                send_msg_id = self.account.send_image(
                         chat_id=chat_id,
                         file_path=image_path,
                         message=msg_content,
@@ -171,13 +180,13 @@ class Engagement(BaseModule):
             except ImageDownloadFailedException as e:
                 logger.error(e)
                 self._counter(type="error-image-download").inc()
-                send_msg_id = self.ctx.account.send_message(
+                send_msg_id = self.account.send_message(
                     chat_id=chat_id,
                     message=f"{msg_content} {REPLY_MSG_ERROR_IMG}",
                     reply_to_message_id=reply_id
                 )
         else:
-            send_msg_id = self.ctx.account.send_message(
+            send_msg_id = self.account.send_message(
                 chat_id=chat_id,
                 message=msg_content,
                 reply_to_message_id=reply_id)
@@ -188,23 +197,23 @@ class Engagement(BaseModule):
     """
         Manage message sent to the Bot by a User
     """
-    def handle_users_messages(self, messages: list[dict], db_session):
+    def handle_users_messages(self, messages: list[dict], db_session: Session):
         user_public_key = messages[0].get("from")
         message_id = messages[0].get("id")
         reply_id = get_response_reply_if_exist(db_session, messages)
         if not self.is_feedback_message(messages) and not reply_id:
             logger.info("Not matching the feedback keywords")
-            self.ctx.account.send_message(
+            self.account.send_message(
                 chat_id=user_public_key,
-                message=self.ctx.config.settings.get("helper_message"),
+                message=self.settings.get("helper_message"),
                 reply_to_message_id=message_id)
             self._counter.labels(type="invalid-feedback-query").inc()
             return
 
         logger.info(f"A new feedback message has been received from {user_public_key}")
-        self.ctx.account.send_message(
+        self.account.send_message(
                 chat_id=user_public_key,
-                message=self.ctx.config.settings.get("automatic_reply"),
+                message=self.settings.get("automatic_reply"),
                 reply_to_message_id=message_id)
         self._counter.labels(type="valid-feedback-query").inc()
 
@@ -219,7 +228,7 @@ class Engagement(BaseModule):
                 # sending the config message only for the first message of a feedback
                 # request, not for reply or for other photos
                 self.group_chat.send_message(
-                    message=self.ctx.config.settings.get("group_message_text"))
+                    message=self.settings.get("group_message_text"))
 
             msg_id = self.send_message(self.group_chat.id, msg, request_text, reply_id)
 
@@ -237,7 +246,7 @@ class Engagement(BaseModule):
     """
         Manage messages sent by the GroupChat to be transfert to the users
     """
-    def find_reply(self, messages: list[dict], db_session):
+    def find_reply(self, messages: list[dict], db_session: Session):
         responseTo = messages[0].get("responseTo")
         if responseTo is None or responseTo == "":
             logger.debug("The message isn't a reply, ignoring it")
@@ -269,29 +278,34 @@ class Engagement(BaseModule):
             if event_data is None:
                 logger.error("Invalid event")
                 return
+
             if event_type == EventTypeEnum.LOCAL_NOTIFICATION.value and event_data.get("category") == NotificationCategoryEnum.CONTACT_REQUEST.value:
-                self.hanlde_contact_request(event_data, db_session)
+                self.handle_contact_request(event_data, db_session)
                 return
-            if event_type == EventTypeEnum.MESSAGE.value and event_data.get("messages") is not None:
-                messages = event_data.get("messages")
+            if event_type != EventTypeEnum.MESSAGE.value:
+                return
+            if event_data.get("messages") is None:
+                return
 
-                if messages is None or len(messages) == 0:
-                    raise ValueError("No message in the event")
+            messages = self.extract_user_messages(event_data.get("messages", []))
+            if len(messages) == 0:
+                logger.warning("No message from a user in the signal")
+                return
 
-                clean_msg_list = self.extract_user_messages(messages)
-                if len(clean_msg_list) == 0:
-                    logger.warning("No message from a user in the signal")
-                    return
-                if event_data.get("chats")[0].get("id") == self.group_chat.id:
-                    self.find_reply(clean_msg_list, db_session)
-                else:
-                    self.handle_users_messages(clean_msg_list, db_session)
+            if is_group_chat_message(event_data, chat_id=self.group_chat.id):
+                self.find_reply(messages, db_session)
+                return
+            elif is_group_chat_message(event_data):
+                logger.debug("Ignoring message from GroupChat outside of official group")
+                return
+            else:
+                self.handle_users_messages(messages, db_session)
 
     def execute(self):
         if self.ctx.db is None:
             return
         logger.info("Executing module PeriodicEngagement")
-        planned_messages = self.ctx.config.settings.get("periodic_messages", [])
+        planned_messages = self.settings.get("periodic_messages", [])
         for planned_message in planned_messages:
             _delay = planned_message.get("delay")
             _message = planned_message.get("message")
@@ -299,10 +313,10 @@ class Engagement(BaseModule):
             with self.ctx.db.session() as session:
                 contacts = get_all_contact_to_contact(
                     session, _delay,
-                    self.ctx.config.settings.get("delay_type", "days"))
+                    self.settings.get("delay_type", "days"))
                 logger.info(f"Found {len(contacts)} contacts to send a messages")
                 for c in contacts:
-                    self.ctx.account.send_message(chat_id=c.public_key, message=_message)
+                    self.account.send_message(chat_id=c.public_key, message=_message)
                     c.last_engagement_message = _delay
                     self._peridic_counter.labels(delay=_delay).inc()
                 session.commit()
