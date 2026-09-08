@@ -1,10 +1,5 @@
 # Engagement
 
-The Engagement Modules are set to help new user understand the Status App and share feedback, feature request and question with the Team.
-It is composed of two modules:
-* `EngagementEvent` - Response at the event the Bot is receiving.
-* `EngagementPeriodic` - Send messages based on the contact request from the Bot.
-
 The Engagement Module in the Status Bot is designed to automate user interactions in the Status App.
 Its primary functions include:
 1. Contact Request Handling
@@ -35,7 +30,8 @@ Its primary functions include:
 | `image_folder` | `str` | ✅ | Directory where downloaded images (e.g., from user messages) are stored. | `"/app/assets/images"` |
 | `periodic_messages` | `List[dict]` | ✅ | List of **scheduled follow-up messages** with delays and content. | `[ { delay: 1, message: "Bring someone you know to Status 👋..." }, { delay: 2, message: "Find your people 🌐..." } ]` |
 | `group_message_text` | `str` | ❌ | Message sent to the **feedback group chat** when a new user request is forwarded. | `"A user has shared the following request. Reply to the message to transfer it to the user."` |
-| `delay_type` | `str` | ❌ | Unit for periodic message delays (`days` or `minutes`). | `"minutes"` |
+| `delay_type` | `str` | ❌ | Unit for periodic message delays (`days` or `minutes`), by default `days`, used for testing. | `"minutes"` |
+| `retention_time` | `int` | ❌ | Number of day to keep the FeedbackMessage in database, by default 90 days. | `90` |
 
 ### `group_chat`
 
@@ -78,8 +74,8 @@ This module store in the database the following object.
 |-----------|----------|--------------|----------------|
 | `id` | `String` | ❌ | Unique identifier for the feedback message (matches the original message ID from the Status App). |
 | `public_key` | `String` | ❌ | Public key of the **user** who sent the feedback request. |
+| `response_timestamp` | `Datatime` | ❌ | Timestamp (Unix epoch) when the Status Team **replied** to the request. |
 | `group_chat_message_id` | `String` | ✅ | ID of the message in the **feedback group chat** where the request was forwarded. |
-| `response_timestamp` | `BigInteger` | ✅ | Timestamp (Unix epoch) when the Status Team **replied** to the request. |
 | `response_message` | `String` | ✅ | The **content** of the Status Team's reply. |
 | `reply_chat_id` | `String` | ✅ | ID of the **reply message** sent back to the user. |
 | `reply_group_id` | `String` | ✅ | ID of the **group message** that triggered the reply (if applicable). |
@@ -88,6 +84,10 @@ This module store in the database the following object.
 - The messages id and user address is mandatory to ensures replies are routed back to the correct user.
 - The message content and timestamp are kept to audit the system.
 
+
+**Data Retention**
+The feedback messages are kept 90 days in the database. After than limit, the data is removed.
+If a user remove the Bot as a contact, all row matching his `public_key` will be removed.
 
 ### `ContactRequest`
 
@@ -105,12 +105,15 @@ This module store in the database the following object.
 - Manages periodic engagement and keep track of which message has been sent.
 - Helps distinguish between first-time users (who receive `first_messages`) and returning users (who receive `existing_users_messages`).
 
+**Data Retention**
+If a user remove the Bot as a contact, the row matching his `public_key` will be removed.
+
 ## Metrics
 
 ### `status_bot_engagement_actions`
 
 A counter that tracks user engagement actions with a type label.
-It has different label based on the types of actions done:
+It has different labels based on the types of actions done. Each counter label are incremented when the action is done:
 - `received_request` – A contact request was received.
 - `accepted_request` – A contact request was accepted.
 - `first_messages` – Welcome message sent to a new user.
@@ -121,10 +124,14 @@ It has different label based on the types of actions done:
 - `original-not-found` – Reply failed (original message not found in DB).
 - `sent-reply` – Reply successfully sent from the group chat to user.
 - `error-image-download` - An error happened during a image download
+- `contact-removed` - A user a removed the bot from his contact, the data are deleted
+- `periodic-message-del` - Remove feedback message older than 31 days
 
 #### `status_bot_engagement_periodic`
 
 A counter, that tracks periodic engagement messages with a the delay as label (e.g., 1, 7, 30).
 It incremented when a scheduled follow-up message is sent to a user.
+
+
 
 

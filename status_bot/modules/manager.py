@@ -216,7 +216,7 @@ class ModuleManager:
 
 
     def _run_event_listener(self) -> None:
-        for event in self._account.signal.listen([EventTypeEnum.LOCAL_NOTIFICATION.value,EventTypeEnum.MESSAGE.value]):
+        for event in self._account.signal.listen([EventTypeEnum.MESSAGE.value]):
             event_type = event.get('type')
             logger.info(f"Received a {event_type}")
             if self._stop_event.is_set():

@@ -66,23 +66,7 @@ def save_file(file_path: str, data: Any):
         pickle.dump(data, f)
 
 
-def extract_contact_request(event: dict, new_user_message: str) -> ContactRequest:
-    body = event.get('body')
-    if body is None:
-        raise ValueError("Missing Body from the ContactRequest")
-    contact_event = body.get("contact")
-    if contact_event is None:
-        raise ValueError("Missing contact part from the ContactRequest")
-    return ContactRequest(
-            id=body.get("message").get("id"),
-            public_key=contact_event.get("id"),
-            request_timestamp=datetime.datetime.fromtimestamp(
-                event.get("timestamp", 0) / 1_000
-            ),
-            is_new_user=event.get("message") == new_user_message
-        )
-
-def download_image(url: str, image_path):
+def download_image(url: str, image_path: str):
     session = requests.Session()
     session.trust_env = False  # Avoid proxy conflicts
 

@@ -1,6 +1,6 @@
 import logging
 
-from typing import Optional
+from typing import Any, Optional
 from datetime import datetime, timedelta
 from prometheus_client import Counter
 
@@ -10,11 +10,9 @@ from sqlalchemy.orm import Session
 from status_bot.constants import EventTypeEnum, NotificationCategoryEnum
 from status_bot.models import FeedbackMessage, ContactRequest
 from status_bot.modules.base import BaseModule, ModuleType
-from status_bot.modules.utils import download_image, extract_contact_request, download_image, is_group_chat_message
+from status_bot.modules.utils import download_image, is_group_chat_message
 from status_bot.exceptions import ImageDownloadFailedException
 from status_sdk import GroupChat
-
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +27,11 @@ MANDATORY_CONFIG_FIELD = [
 REPLY_MSG_ERROR_IMG = "\nAn image was sent, but an error occured during the download"
 
 IGNORED_MSG_CONTENT_TYPE = [
-    11, # Contact request
     15, # Send contact request
-    17  # Removed Contact
 ]
+MSG_TYPE_CONTACT_REQUEST = 11
+MSG_TYPE_REMOVE_CONTACT = 17
+
 
 def get_all_contact_to_contact(db_session: Session, delay: int, delay_unit: str):
     threshold = datetime.now() - timedelta(days=delay)
@@ -100,17 +99,22 @@ class Engagement(BaseModule):
 
 
 
-    def handle_contact_request(self, event_data: dict, db_session: Session):
+    def handle_contact_request(self, message: dict, db_session: Session):
         """
         Function to handle new contact request.
         It accept all contact request, save the contact in the database
         Send the messages to the user based on `first_messages`.
         Parameters:
-            - event_data: event content transmitted by the Backend
+            - message: first message part of the event content transmitted by the Backend
             - session: ORM database session
         """
-        new_contact: ContactRequest = extract_contact_request(
-                event_data, self.settings.get("new_user_message_contact_request", ""))
+        new_contact: ContactRequest = ContactRequest(
+            id=message.get("id"),
+            public_key=message.get("from"),
+            request_timestamp=datetime.fromtimestamp(
+                message.get("timestamp", 0) / 1_000
+            ),
+            is_new_user=message.get("text") == self.settings.get("new_user_message_contact_request", ""))
         self._counter.labels(type="received_request").inc()
         logger.info(f"Accepting the contact request from {new_contact.public_key}")
         self.account.add_contact(new_contact.public_key)
@@ -127,9 +131,27 @@ class Engagement(BaseModule):
                 message=msg)
         self._counter.labels(type=message_properties).inc()
 
+    def remove_contact(self, message: dict, db_session: Session):
+        """
+        Function to handle removal of contact.
+        When a user remove the bot as a contact, all data with the user public key
+        Parameters:
+            - message: first message part of the event content transmitted by the Backend
+            - session: ORM database session
 
+        """
+        user_public_key = message.get("from")
+        logger.info("Received a Contact Removal")
+        db_session.query(FeedbackMessage).filter(
+            FeedbackMessage.public_key == user_public_key
+        ).delete()
+        db_session.query(ContactRequest).filter(
+            ContactRequest.public_key == user_public_key
+        ).delete()
+        db_session.commit()
+        self._counter.labels(type="contact-removed").inc()
 
-    def extract_user_messages(self, messages: list[dict]) -> list[dict]:
+    def extract_user_messages(self, messages: list[dict]) -> tuple[int, list[dict]]:
         """
             This function take the raw messages from the signal and remove the messages from
             the bot account.
@@ -143,6 +165,7 @@ class Engagement(BaseModule):
                 - List of messages from the user
         """
         clean_msg_list = []
+        message_type: int = 1
         for msg in messages:
             if msg.get("compressedKey") == self.account.info["compressed_key"]:
                 continue
@@ -151,8 +174,9 @@ class Engagement(BaseModule):
             if msg.get("contentType") in IGNORED_MSG_CONTENT_TYPE:
                 continue
             clean_msg_list.append(msg)
+            message_type = msg.get("contentType", 1)
 
-        return clean_msg_list
+        return message_type, clean_msg_list
 
 
     def is_feedback_message(self, messages: list[dict]) -> bool:
@@ -194,10 +218,11 @@ class Engagement(BaseModule):
         return send_msg_id
 
 
-    """
-        Manage message sent to the Bot by a User
-    """
+
     def handle_users_messages(self, messages: list[dict], db_session: Session):
+        """
+            Manage messages sent to the Bot by a User
+        """
         user_public_key = messages[0].get("from")
         message_id = messages[0].get("id")
         reply_id = get_response_reply_if_exist(db_session, messages)
@@ -217,7 +242,6 @@ class Engagement(BaseModule):
                 reply_to_message_id=message_id)
         self._counter.labels(type="valid-feedback-query").inc()
 
-
         first_msg = True
         for msg in messages:
             request_text = msg.get("text", "")
@@ -235,7 +259,9 @@ class Engagement(BaseModule):
             feedback_message: FeedbackMessage = FeedbackMessage(
                 id=message_id,
                 public_key=user_public_key,
-                chat_id=messages[0].get("chatId"),
+                request_timestamp=datetime.fromtimestamp(
+                    messages[0].get("timestamp", 0) / 1_000
+                ),
                 group_chat_message_id=msg_id)
             logger.debug(f"Sending the request {feedback_message.id} to ChatGroup")
 
@@ -267,7 +293,9 @@ class Engagement(BaseModule):
                 original_message.id)
         self._counter.labels(type="sent-reply").inc()
         original_message.response_message = reply_content
-        original_message.response_timestamp = messages[0].get("timestamp")
+        original_message.response_timestamp = datetime.fromtimestamp(
+            messages[0].get("timestamp", 0) / 1_000
+        )
         original_message.reply_chat_id = reply_id
         db_session.merge(original_message)
         db_session.commit()
@@ -279,17 +307,20 @@ class Engagement(BaseModule):
                 logger.error("Invalid event")
                 return
 
-            if event_type == EventTypeEnum.LOCAL_NOTIFICATION.value and event_data.get("category") == NotificationCategoryEnum.CONTACT_REQUEST.value:
-                self.handle_contact_request(event_data, db_session)
-                return
-            if event_type != EventTypeEnum.MESSAGE.value:
-                return
-            if event_data.get("messages") is None:
+            if event_type != EventTypeEnum.MESSAGE.value or event_data.get("messages") is None:
                 return
 
-            messages = self.extract_user_messages(event_data.get("messages", []))
+            message_type, messages = self.extract_user_messages(event_data.get("messages", []))
             if len(messages) == 0:
                 logger.warning("No message from a user in the signal")
+                return
+
+            if message_type == MSG_TYPE_CONTACT_REQUEST:
+                self.handle_contact_request(messages[0], db_session)
+                return
+
+            if message_type == MSG_TYPE_REMOVE_CONTACT:
+                self.remove_contact(messages[0], db_session)
                 return
 
             if is_group_chat_message(event_data, chat_id=self.group_chat.id):
@@ -301,25 +332,51 @@ class Engagement(BaseModule):
             else:
                 self.handle_users_messages(messages, db_session)
 
+
+    def delete_old_messages(self, db_session: Session):
+        """
+        Delete all trace of messages stored for more than 31 days.
+        In order to not store not necessary data.
+        Parameters:
+            - db_session: ORM database session
+        """
+        retention_time = self.settings.get("retention_time", 90)
+        threshold = datetime.now() - timedelta(days=retention_time)
+        # For testing purpose
+        if self.settings.get("delay_type", "days") != "days":
+            threshold = datetime.utcnow() - timedelta(minutes=retention_time)
+        logger.info(f"Threshold {threshold}")
+        msgs = db_session.query(FeedbackMessage).filter(
+            FeedbackMessage.request_timestamp < threshold
+        ).all()
+        logger.info(f"Deleting {len(msgs)}")
+        for msg in msgs:
+            db_session.delete(msg)
+            self._counter.labels(type="periodic-message-del").inc()
+        db_session.commit()
+
     def execute(self):
         if self.ctx.db is None:
             return
-        logger.info("Executing module PeriodicEngagement")
+        logger.info("Periodic executing of the module Engagement")
         planned_messages = self.settings.get("periodic_messages", [])
-        for planned_message in planned_messages:
-            _delay = planned_message.get("delay")
-            _message = planned_message.get("message")
-            logger.info(f"Looking for contact to send message with delay {_delay}")
-            with self.ctx.db.session() as session:
+        with self.ctx.db.session() as db_session:
+            for planned_message in planned_messages:
+                _delay = planned_message.get("delay")
+                _message = planned_message.get("message")
                 contacts = get_all_contact_to_contact(
-                    session, _delay,
+                    db_session, _delay,
                     self.settings.get("delay_type", "days"))
-                logger.info(f"Found {len(contacts)} contacts to send a messages")
+                logger.info(
+                    f"Found {len(contacts)} contacts to send the message with {_delay} delay")
                 for c in contacts:
                     self.account.send_message(chat_id=c.public_key, message=_message)
                     c.last_engagement_message = _delay
                     self._peridic_counter.labels(delay=_delay).inc()
-                session.commit()
+                db_session.commit()
+
+            self.delete_old_messages(db_session)
+            logger.info("End of the periodic execution")
 
     def register_metrics(self) -> None:
         self._peridic_counter = Counter(
