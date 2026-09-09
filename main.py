@@ -132,6 +132,7 @@ def main():
     def handle_sigterm(signum, frame):
         logger.info("Received SIGTERM, shutting down...")
         stop_event.set()
+        account.logout()
 
     signal.signal(signal.SIGTERM, handle_sigterm)
     signal.signal(signal.SIGINT, handle_sigterm)

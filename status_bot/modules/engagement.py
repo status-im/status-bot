@@ -37,7 +37,7 @@ def get_all_contact_to_contact(db_session: Session, delay: int, delay_unit: str)
     threshold = datetime.now() - timedelta(days=delay)
     if delay_unit != "days":
         threshold = datetime.utcnow() - timedelta(minutes=delay)
-    logger.info(f"Threshold {threshold}")
+    logger.debug(f"Threshold {threshold}")
 
     return db_session.query(ContactRequest).filter(
         and_(
@@ -79,7 +79,7 @@ class Engagement(BaseModule):
             raise ConnectionError("Database connection not setup")
         group_chat_config=self.settings.get("group_chat", {})
         if not group_chat_config.get("group_id"):
-            logger.debug("Initializing new GroupChat")
+            logger.info("Initializing new GroupChat")
             contacts = [contact["public_key"] for contact in
                         self.account.contacts.values() if contact["compressed_key"]
                         in group_chat_config.get("participants")]
@@ -189,21 +189,34 @@ class Engagement(BaseModule):
         return any(kw in messages[0].get("text").lower() for kw in feedback_keywords)
 
     def send_message(self, chat_id: str, orignal_message: dict, msg_content: str, reply_id: Optional[str]):
+        """
+            Send message to either the group chat or the user.
+            Download an image with there is an image to transfer.
+            Parameters:
+                - chat_id: Id of the chat to contact
+                - original_message: Message to transfer
+                - msg_content: content of the message to tranfert
+                - reply_id: optional id of the message that require a reply
+            Ouput:
+                - message id
+        """
         send_msg_id=None
         if orignal_message.get("image"):
+            image_path=f"{self.settings.get('image_folder')}/{orignal_message.get('id')}"
             try:
-                image_path=f"{self.settings.get('image_folder')}/{orignal_message.get('id')}"
+                logger.debug(f"Downloading image at the path {image_path}")
                 download_image(
                     url=orignal_message.get("image", "").replace('localhost', 'backend'),
                     image_path=image_path)
+
                 send_msg_id = self.account.send_image(
                         chat_id=chat_id,
                         file_path=image_path,
                         message=msg_content,
                         reply_to_message_id=reply_id)
-            except ImageDownloadFailedException as e:
+            except Exception as e:
                 logger.error(e)
-                self._counter(type="error-image-download").inc()
+                self._counter.labels(type="error-image-download").inc()
                 send_msg_id = self.account.send_message(
                     chat_id=chat_id,
                     message=f"{msg_content} {REPLY_MSG_ERROR_IMG}",
@@ -227,7 +240,7 @@ class Engagement(BaseModule):
         message_id = messages[0].get("id")
         reply_id = get_response_reply_if_exist(db_session, messages)
         if not self.is_feedback_message(messages) and not reply_id:
-            logger.info("Not matching the feedback keywords")
+            logger.debug("Not matching the feedback keywords")
             self.account.send_message(
                 chat_id=user_public_key,
                 message=self.settings.get("helper_message"),
@@ -235,7 +248,7 @@ class Engagement(BaseModule):
             self._counter.labels(type="invalid-feedback-query").inc()
             return
 
-        logger.info(f"A new feedback message has been received from {user_public_key}")
+        logger.debug("A new feedback message has been received")
         self.account.send_message(
                 chat_id=user_public_key,
                 message=self.settings.get("automatic_reply"),
@@ -345,11 +358,11 @@ class Engagement(BaseModule):
         # For testing purpose
         if self.settings.get("delay_type", "days") != "days":
             threshold = datetime.utcnow() - timedelta(minutes=retention_time)
-        logger.info(f"Threshold {threshold}")
+        logger.debug(f"Threshold {threshold} for message deletion")
         msgs = db_session.query(FeedbackMessage).filter(
             FeedbackMessage.request_timestamp < threshold
         ).all()
-        logger.info(f"Deleting {len(msgs)}")
+        logger.info(f"Deleting {len(msgs)} messages having reach the retention time of {retention_time}")
         for msg in msgs:
             db_session.delete(msg)
             self._counter.labels(type="periodic-message-del").inc()

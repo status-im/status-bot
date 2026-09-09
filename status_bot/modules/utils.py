@@ -74,13 +74,15 @@ def download_image(url: str, image_path: str):
     retries = Retry(total=3, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
     session.mount('https://', HTTPAdapter(max_retries=retries))
     try:
-        logger.info(f"Image URL {url}")
+        logger.debug(f"Image URL {url}")
         response = session.get(url, verify=False, stream=True, timeout=10)
         logger.debug("Starting the download")
         with open(image_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 if chunk:
                     f.write(chunk)
+                else:
+                    logger.info("No chunk")
         logger.debug(f"Image successfully downloaded to {image_path}")
 
         response.raise_for_status()  # Raise an exception for HTTP errors
