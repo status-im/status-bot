@@ -124,7 +124,7 @@ def main():
     manager.load_modules()
 
     if db is not None:
-        db.create_tables(config.database.schema)
+        db.create_tables(config.database.schema_name)
 
     start_prometheus(config.metrics, manager, config.bot.name)
 

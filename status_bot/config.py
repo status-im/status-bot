@@ -36,7 +36,7 @@ class DatabaseConfig(BaseModel):
     user: str = ""
     password: str = ""
     name: str = ""
-    schema: str = "public"
+    schema_name: str = "public"
     tables: dict = {}
 
 
