@@ -1,0 +1,42 @@
+name: Draft Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-and-release:
+    runs-on: ['self-hosted','ubuntu-22.04']
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify CHANGELOG.md contains version title
+        run: |
+          # 1. Check file existence
+          if [ ! -f CHANGELOG.md ]; then
+            echo "::error::CHANGELOG.md is missing!"
+            exit 1
+          fi
+
+          TAG_NAME="${GITHUB_REF_NAME}"
+
+          STRIPPED_TAG="${TAG_NAME#v}"
+
+          if grep -E "^#+ .*(${TAG_NAME}|${STRIPPED_TAG})" CHANGELOG.md > /dev/null; then
+            echo "SUCCESS: Found heading for ${TAG_NAME} in CHANGELOG.md"
+          else
+            echo "::error::CHANGELOG.md does not contain a title for version ${TAG_NAME} or ${STRIPPED_TAG}!"
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
