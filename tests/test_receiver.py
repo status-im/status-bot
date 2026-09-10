@@ -168,7 +168,7 @@ def _receiver_module(db) -> receiver.ReceiverModule:
 
 
 def test_process_and_insert_persists_rows_via_session():
-    db = Database("sqlite", host="", port=0, user="", password="", name=":memory:", schema="public")
+    db = Database("sqlite", host="", port=0, user="", password="", name=":memory:")
     db.create_tables()
     module = _receiver_module(db)
 
@@ -194,7 +194,7 @@ def test_process_and_insert_persists_rows_via_session():
 
 
 def test_process_and_insert_drops_non_model_columns():
-    db = Database("sqlite", host="", port=0, user="", password="", name=":memory:", schema="public")
+    db = Database("sqlite", host="", port=0, user="", password="", name=":memory:")
     db.create_tables()
     module = _receiver_module(db)
 
@@ -213,7 +213,7 @@ def test_process_and_insert_drops_non_model_columns():
 
 
 def test_process_and_insert_skips_duplicate_primary_keys():
-    db = Database("sqlite", host="", port=0, user="", password="", name=":memory:", schema="public")
+    db = Database("sqlite", host="", port=0, user="", password="", name=":memory:")
     db.create_tables()
     module = _receiver_module(db)
 

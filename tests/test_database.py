@@ -9,7 +9,7 @@ from status_bot.models.message import ReceivedMessage
 
 
 def _database() -> Database:
-    db = Database("sqlite", host="", port=0, user="", password="", name=":memory:", schema="public")
+    db = Database("sqlite", host="", port=0, user="", password="", name=":memory:")
     db.create_tables()
     return db
 
