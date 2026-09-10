@@ -31,7 +31,7 @@ it will require a `.env` file for secrets and `config.yaml`. The configuration i
 The differents test suites can be run with:
 ```bash
 pip install -e ".[dev]"
-pytest test/
+pytest tests/
 ```
 
 # Backups
