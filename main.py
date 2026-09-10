@@ -27,6 +27,7 @@ def create_bot(config: Config, project_root: str) -> Account:
         coingecko_api_key=config.bot.coingecko_api_key
     )
 
+    logger.info(f"account loaded compressed key : {account.info['compressed_key']}")
     if account.info["compressed_key"] != config.bot.chat_key:
         raise Exception(
             "Target compressed key and logged in chat key are different."
@@ -125,7 +126,7 @@ def main():
     if db is not None:
         db.create_tables(config.database.schema)
 
-    start_prometheus(config.metrics, manager)
+    start_prometheus(config.metrics, manager, config.bot.name)
 
     stop_event = manager._stop_event
 

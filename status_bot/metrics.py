@@ -7,13 +7,14 @@ from prometheus_client import start_http_server, Gauge, Counter
 logger = logging.getLogger(__name__)
 
 
-def start_prometheus(metrics_config: MetricsConfig, manager: ModuleManager):
+def start_prometheus(metrics_config: MetricsConfig, manager: ModuleManager, account_name: str):
     if not metrics_config.enabled:
         logger.info("Prometheus metrics exporter disabled")
         return
 
     health = Gauge("status_bot_health", "Bot health status")
-    version = Gauge("status_bot_version", "Bot version", ["version"])
+    version = Gauge("status_bot_version", "Bot version", ["version", "name"])
+
     module_loaded = Gauge(
         "status_bot_module_loaded", "Module loaded", ["module"]
     )
@@ -25,7 +26,7 @@ def start_prometheus(metrics_config: MetricsConfig, manager: ModuleManager):
     )
 
     health.set(1)
-    version.labels(version="1.0.0").set(1)
+    version.labels(version="1.0.0", name=account_name).set(1)
 
     for module_name in manager.module_names:
         module_loaded.labels(module=module_name).set(1)

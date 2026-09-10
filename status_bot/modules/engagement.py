@@ -116,14 +116,12 @@ class Engagement(BaseModule):
             ),
             is_new_user=message.get("text") == self.settings.get("new_user_message_contact_request", ""))
         self._counter.labels(type="received_request").inc()
-        logger.info(f"Accepting the contact request from {new_contact.public_key}")
         self.account.add_contact(
             public_key=new_contact.public_key,
             request_id=message.get("id"))
         db_session.merge(new_contact)
         db_session.commit()
         self._counter.labels(type="accepted_request").inc()
-        logger.info(f"Sending first message to {new_contact.public_key}")
         message_properties = "existing_users_messages"
         if new_contact.is_new_user:
             message_properties = "first_messages"
