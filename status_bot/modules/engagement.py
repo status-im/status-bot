@@ -1,17 +1,16 @@
 import logging
 
-from typing import Any, Optional
+from typing import Optional
 from datetime import datetime, timedelta
 from prometheus_client import Counter
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from status_bot.constants import EventTypeEnum, NotificationCategoryEnum
+from status_bot.constants import EventTypeEnum
 from status_bot.models import FeedbackMessage, ContactRequest
 from status_bot.modules.base import BaseModule, ModuleType
 from status_bot.modules.utils import download_image, is_group_chat_message
-from status_bot.exceptions import ImageDownloadFailedException
 from status_sdk import GroupChat
 
 logger = logging.getLogger(__name__)

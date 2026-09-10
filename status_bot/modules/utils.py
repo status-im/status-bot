@@ -13,7 +13,6 @@ from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
 from status_bot.exceptions import ImageDownloadFailedException
-from status_bot.models import ContactRequest
 
 logger = logging.getLogger(__name__)
 

@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from status_sdk import Account
 from status_bot import Database
-import threading, logging
+import threading
+import logging
 
-from prometheus_client import Counter, Gauge
 
 
 class ModuleType(Enum):

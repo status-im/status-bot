@@ -4,7 +4,8 @@ from status_bot import models
 from typing import Union
 from status_sdk import Community
 import pandas as pd
-import datetime, sqlalchemy
+import datetime
+import sqlalchemy
 
 try:
     from detoxify import Detoxify
