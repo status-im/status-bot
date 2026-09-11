@@ -43,9 +43,9 @@ def test_orm_round_trip_for_namespaced_model():
     with db.session() as session:
         session.add(
             Visit(
-                chat_id="chat-1",
-                visitor="alice",
-                seen_at=datetime.datetime(2024, 1, 1, 12, 0, 0)))
+                chat_id="chat-1", visitor="alice", seen_at=datetime.datetime(2024, 1, 1, 12, 0, 0)
+            )
+        )
         session.commit()
 
     with db.session() as session:

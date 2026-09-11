@@ -17,16 +17,22 @@ logger = logging.getLogger(__name__)
 
 MANDATORY_CONFIG_FIELD = [
     # Events Config
-    "first_messages", "feedback_keywords","helper_message", "automatic_reply", "group_chat",
-    "new_user_message_contact_request", "existing_users_messages", "image_folder",
+    "first_messages",
+    "feedback_keywords",
+    "helper_message",
+    "automatic_reply",
+    "group_chat",
+    "new_user_message_contact_request",
+    "existing_users_messages",
+    "image_folder",
     # Periodic Config
-    "periodic_messages"
+    "periodic_messages",
 ]
 
 REPLY_MSG_ERROR_IMG = "\nAn image was sent, but an error occured during the download"
 
 IGNORED_MSG_CONTENT_TYPE = [
-    15, # Send contact request
+    15,  # Send contact request
 ]
 MSG_TYPE_CONTACT_REQUEST = 11
 MSG_TYPE_REMOVE_CONTACT = 17
@@ -38,31 +44,36 @@ def get_all_contact_to_contact(db_session: Session, delay: int, delay_unit: str)
         threshold = datetime.utcnow() - timedelta(minutes=delay)
     logger.debug(f"Threshold {threshold}")
 
-    return db_session.query(ContactRequest).filter(
-        and_(
-            ContactRequest.request_timestamp < threshold,
-            ContactRequest.last_engagement_message < delay,
-            ContactRequest.is_new_user
+    return (
+        db_session.query(ContactRequest)
+        .filter(
+            and_(
+                ContactRequest.request_timestamp < threshold,
+                ContactRequest.last_engagement_message < delay,
+                ContactRequest.is_new_user,
+            )
         )
-    ).all()
+        .all()
+    )
+
 
 def get_response_reply_if_exist(db_session: Session, messages: list[dict]) -> Optional[str]:
-    msg_response_to = next(
-       (msg["responseTo"] for msg in messages if "responseTo" in msg),
-        None
-    )
+    msg_response_to = next((msg["responseTo"] for msg in messages if "responseTo" in msg), None)
     if msg_response_to:
         logger.debug(f"replying to message {msg_response_to}")
-        reply_to = db_session.query(FeedbackMessage).filter(
-                FeedbackMessage.reply_chat_id==msg_response_to).first()
+        reply_to = (
+            db_session.query(FeedbackMessage)
+            .filter(FeedbackMessage.reply_chat_id == msg_response_to)
+            .first()
+        )
         logger.debug(f"Original Message here {reply_to}")
         if reply_to:
             return reply_to.reply_chat_id
 
     return None
 
-class Engagement(BaseModule):
 
+class Engagement(BaseModule):
     DESCRIPTION = """
         Module made for Engagmement in the Status App.
         It accept all the friend request and send welcome message
@@ -77,27 +88,27 @@ class Engagement(BaseModule):
         self._verify_mandatory_config(MANDATORY_CONFIG_FIELD)
         if self.ctx.db is None:
             raise ConnectionError("Database connection not setup")
-        group_chat_config=self.settings.get("group_chat", {})
+        group_chat_config = self.settings.get("group_chat", {})
         if not group_chat_config.get("group_id"):
             logger.info("Initializing new GroupChat")
-            contacts = [contact["public_key"] for contact in
-                        self.account.contacts.values() if contact["compressed_key"]
-                        in group_chat_config.get("participants")]
+            contacts = [
+                contact["public_key"]
+                for contact in self.account.contacts.values()
+                if contact["compressed_key"] in group_chat_config.get("participants")
+            ]
             for c in contacts:
                 self.account.add_contact(c)
             logger.info(f"Creating group with {contacts}")
             self.group_chat = GroupChat(self.account).create(
-                    public_keys=contacts,
-                    name=group_chat_config.get("name"))
+                public_keys=contacts, name=group_chat_config.get("name")
+            )
             logger.info(f"New Group {group_chat_config.get('name')} created: {self.group_chat.id}")
         else:
             logger.info("Loading existing GroupChat")
             self.group_chat = GroupChat(
-                    account=self.account,
-                    chat_id=group_chat_config.get("group_id"))
+                account=self.account, chat_id=group_chat_config.get("group_id")
+            )
         logger.info(f"Feedback keyword configured are: {self.settings.get('feedback_keywords')}")
-
-
 
     def handle_contact_request(self, message: dict, db_session: Session):
         """
@@ -111,15 +122,12 @@ class Engagement(BaseModule):
         new_contact: ContactRequest = ContactRequest(
             id=message.get("id"),
             public_key=message.get("from"),
-            request_timestamp=datetime.fromtimestamp(
-                message.get("timestamp", 0) / 1_000
-            ),
-            is_new_user=message.get("text") == self.settings.get(
-                "new_user_message_contact_request", ""))
+            request_timestamp=datetime.fromtimestamp(message.get("timestamp", 0) / 1_000),
+            is_new_user=message.get("text")
+            == self.settings.get("new_user_message_contact_request", ""),
+        )
         self._counter.labels(type="received_request").inc()
-        self.account.add_contact(
-            public_key=new_contact.public_key,
-            request_id=message.get("id"))
+        self.account.add_contact(public_key=new_contact.public_key, request_id=message.get("id"))
         db_session.merge(new_contact)
         db_session.commit()
         self._counter.labels(type="accepted_request").inc()
@@ -127,9 +135,7 @@ class Engagement(BaseModule):
         if new_contact.is_new_user:
             message_properties = "first_messages"
         for msg in self.settings.get(message_properties, []):
-            self.account.send_message(
-                chat_id=new_contact.public_key,
-                message=msg)
+            self.account.send_message(chat_id=new_contact.public_key, message=msg)
         self._counter.labels(type=message_properties).inc()
 
     def remove_contact(self, message: dict, db_session: Session):
@@ -154,16 +160,16 @@ class Engagement(BaseModule):
 
     def extract_user_messages(self, messages: list[dict]) -> tuple[int, list[dict]]:
         """
-            This function take the raw messages from the signal and remove the messages from
-            the bot account.
-            This help to remove reply content.
+        This function take the raw messages from the signal and remove the messages from
+        the bot account.
+        This help to remove reply content.
 
-            Parameters:
-                - messages: list of messages from the raw signals
-                - bot_compressed_key key
+        Parameters:
+            - messages: list of messages from the raw signals
+            - bot_compressed_key key
 
-            Output:
-                - List of messages from the user
+        Output:
+            - List of messages from the user
         """
         clean_msg_list = []
         message_type: int = 1
@@ -177,67 +183,63 @@ class Engagement(BaseModule):
 
         return message_type, clean_msg_list
 
-
     def is_feedback_message(self, messages: list[dict]) -> bool:
         """
-            Verify if the message concerne the feedback or is concidered spam.
-            Use only the first message since multiple messages are image album
-            and sahre the same text.
+        Verify if the message concerne the feedback or is concidered spam.
+        Use only the first message since multiple messages are image album
+        and sahre the same text.
         """
         feedback_keywords = self.settings.get("feedback_keywords", [])
         return any(kw in messages[0].get("text").lower() for kw in feedback_keywords)
 
-    def send_message(self,
-            chat_id: str,
-            orignal_message: dict,
-            msg_content: str,
-            reply_id: Optional[str]):
+    def send_message(
+        self, chat_id: str, orignal_message: dict, msg_content: str, reply_id: Optional[str]
+    ):
         """
-            Send message to either the group chat or the user.
-            Download an image with there is an image to transfer.
-            Parameters:
-                - chat_id: Id of the chat to contact
-                - original_message: Message to transfer
-                - msg_content: content of the message to tranfert
-                - reply_id: optional id of the message that require a reply
-            Ouput:
-                - message id
+        Send message to either the group chat or the user.
+        Download an image with there is an image to transfer.
+        Parameters:
+            - chat_id: Id of the chat to contact
+            - original_message: Message to transfer
+            - msg_content: content of the message to tranfert
+            - reply_id: optional id of the message that require a reply
+        Ouput:
+            - message id
         """
-        send_msg_id=None
+        send_msg_id = None
         if orignal_message.get("image"):
-            image_path=f"{self.settings.get('image_folder')}/{orignal_message.get('id')}"
+            image_path = f"{self.settings.get('image_folder')}/{orignal_message.get('id')}"
             try:
                 logger.debug(f"Downloading image at the path {image_path}")
                 download_image(
-                    url=orignal_message.get("image", "").replace('localhost', 'backend'),
-                    image_path=image_path)
+                    url=orignal_message.get("image", "").replace("localhost", "backend"),
+                    image_path=image_path,
+                )
 
                 send_msg_id = self.account.send_image(
-                        chat_id=chat_id,
-                        file_path=image_path,
-                        message=msg_content,
-                        reply_to_message_id=reply_id)
+                    chat_id=chat_id,
+                    file_path=image_path,
+                    message=msg_content,
+                    reply_to_message_id=reply_id,
+                )
             except Exception as e:
                 logger.error(e)
                 self._counter.labels(type="error-image-download").inc()
                 send_msg_id = self.account.send_message(
                     chat_id=chat_id,
                     message=f"{msg_content} {REPLY_MSG_ERROR_IMG}",
-                    reply_to_message_id=reply_id
+                    reply_to_message_id=reply_id,
                 )
         else:
             send_msg_id = self.account.send_message(
-                chat_id=chat_id,
-                message=msg_content,
-                reply_to_message_id=reply_id)
+                chat_id=chat_id, message=msg_content, reply_to_message_id=reply_id
+            )
 
         return send_msg_id
 
-
-
     def handle_users_messages(self, messages: list[dict], db_session: Session):
         """
-            Manage messages sent to the Bot by a User
+        Manage messages sent to the Bot by a User
         """
         user_public_key = messages[0].get("from")
         message_id = messages[0].get("id")
@@ -247,15 +249,17 @@ class Engagement(BaseModule):
             self.account.send_message(
                 chat_id=user_public_key,
                 message=self.settings.get("helper_message"),
-                reply_to_message_id=message_id)
+                reply_to_message_id=message_id,
+            )
             self._counter.labels(type="invalid-feedback-query").inc()
             return
 
         logger.debug("A new feedback message has been received")
         self.account.send_message(
-                chat_id=user_public_key,
-                message=self.settings.get("automatic_reply"),
-                reply_to_message_id=message_id)
+            chat_id=user_public_key,
+            message=self.settings.get("automatic_reply"),
+            reply_to_message_id=message_id,
+        )
         self._counter.labels(type="valid-feedback-query").inc()
 
         first_msg = True
@@ -267,18 +271,16 @@ class Engagement(BaseModule):
             if first_msg and not reply_id:
                 # sending the config message only for the first message of a feedback
                 # request, not for reply or for other photos
-                self.group_chat.send_message(
-                    message=self.settings.get("group_message_text"))
+                self.group_chat.send_message(message=self.settings.get("group_message_text"))
 
             msg_id = self.send_message(self.group_chat.id, msg, request_text, reply_id)
 
             feedback_message: FeedbackMessage = FeedbackMessage(
                 id=message_id,
                 public_key=user_public_key,
-                request_timestamp=datetime.fromtimestamp(
-                    messages[0].get("timestamp", 0) / 1_000
-                ),
-                group_chat_message_id=msg_id)
+                request_timestamp=datetime.fromtimestamp(messages[0].get("timestamp", 0) / 1_000),
+                group_chat_message_id=msg_id,
+            )
             logger.debug(f"Sending the request {feedback_message.id} to ChatGroup")
 
             db_session.merge(feedback_message)
@@ -288,13 +290,17 @@ class Engagement(BaseModule):
     """
         Manage messages sent by the GroupChat to be transfert to the users
     """
+
     def find_reply(self, messages: list[dict], db_session: Session):
         responseTo = messages[0].get("responseTo")
         if responseTo is None or responseTo == "":
             logger.debug("The message isn't a reply, ignoring it")
             return
-        original_message: FeedbackMessage = db_session.query(FeedbackMessage).filter(
-                FeedbackMessage.group_chat_message_id==responseTo).first()
+        original_message: FeedbackMessage = (
+            db_session.query(FeedbackMessage)
+            .filter(FeedbackMessage.group_chat_message_id == responseTo)
+            .first()
+        )
         if original_message is None:
             logger.warning(f"No original message found for id {responseTo}")
             self._counter.labels(type="original-not-found").inc()
@@ -304,10 +310,8 @@ class Engagement(BaseModule):
         reply_id: str = ""
         for msg in messages:
             reply_id = self.send_message(
-                original_message.public_key,
-                msg,
-                reply_content,
-                original_message.id)
+                original_message.public_key, msg, reply_content, original_message.id
+            )
         self._counter.labels(type="sent-reply").inc()
         original_message.response_message = reply_content
         original_message.response_timestamp = datetime.fromtimestamp(
@@ -349,7 +353,6 @@ class Engagement(BaseModule):
             else:
                 self.handle_users_messages(messages, db_session)
 
-
     def delete_old_messages(self, db_session: Session):
         """
         Delete all trace of messages stored for more than 31 days.
@@ -363,11 +366,14 @@ class Engagement(BaseModule):
         if self.settings.get("delay_type", "days") != "days":
             threshold = datetime.utcnow() - timedelta(minutes=retention_time)
         logger.debug(f"Threshold {threshold} for message deletion")
-        msgs = db_session.query(FeedbackMessage).filter(
-            FeedbackMessage.request_timestamp < threshold
-        ).all()
+        msgs = (
+            db_session.query(FeedbackMessage)
+            .filter(FeedbackMessage.request_timestamp < threshold)
+            .all()
+        )
         logger.info(
-            f"Deleting {len(msgs)} messages having reach the retention time of {retention_time}")
+            f"Deleting {len(msgs)} messages having reach the retention time of {retention_time}"
+        )
         for msg in msgs:
             db_session.delete(msg)
             self._counter.labels(type="periodic-message-del").inc()
@@ -383,10 +389,11 @@ class Engagement(BaseModule):
                 _delay = planned_message.get("delay")
                 _message = planned_message.get("message")
                 contacts = get_all_contact_to_contact(
-                    db_session, _delay,
-                    self.settings.get("delay_type", "days"))
+                    db_session, _delay, self.settings.get("delay_type", "days")
+                )
                 logger.info(
-                    f"Found {len(contacts)} contacts to send the message with {_delay} delay")
+                    f"Found {len(contacts)} contacts to send the message with {_delay} delay"
+                )
                 for c in contacts:
                     self.account.send_message(chat_id=c.public_key, message=_message)
                     c.last_engagement_message = _delay
@@ -398,12 +405,8 @@ class Engagement(BaseModule):
 
     def register_metrics(self) -> None:
         self._peridic_counter = Counter(
-            "status_bot_engagement_periodic",
-            "Total Message send by delay",
-            ["delay"]
+            "status_bot_engagement_periodic", "Total Message send by delay", ["delay"]
         )
         self._counter = Counter(
-            "status_bot_engagement_actions",
-            "Total Contact Request received",
-            ["type"]
+            "status_bot_engagement_actions", "Total Contact Request received", ["type"]
         )

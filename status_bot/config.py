@@ -15,6 +15,7 @@ class BackendConfig(BaseModel):
     backend_port: int = 8080
     is_secure: bool = False
 
+
 class BotConfig(BaseModel):
     name: str = ""
     chat_key: str = ""
@@ -26,6 +27,7 @@ class BotConfig(BaseModel):
     alchemy_token: Optional[str] = None
     coingecko_api_key: Optional[str] = ""
     bot_hash_pepper: str = ""
+
 
 class DatabaseConfig(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
@@ -64,11 +66,7 @@ class ModulesConfig(BaseModel):
 
 
 class Config(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_nested_delimiter="__",
-        extra="ignore",
-        env_file=".env"
-    )
+    model_config = SettingsConfigDict(env_nested_delimiter="__", extra="ignore", env_file=".env")
 
     logging: LoggingConfig = LoggingConfig()
     files: FilesConfig = FilesConfig()

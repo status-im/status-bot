@@ -17,21 +17,23 @@ def _database() -> Database:
 def test_insert_and_read_back_via_orm():
     db = _database()
     with db.session() as session:
-        session.add(ReceivedMessage(
-            id="msg-1",
-            whisper_timestamp=datetime.datetime(2024, 1, 1, 12, 0, 0),
-            from_="0xuser",
-            alias="Ali",
-            seen=True,
-            rtl=False,
-            line_count=2,
-            text="hello world",
-            chat_id="chat-1",
-            local_chat_id="local-chat-1",
-            ens_name="alice.eth",
-            display_name="Alice",
-            received_timestamp=datetime.datetime(2024, 1, 1, 12, 0, 0),
-        ))
+        session.add(
+            ReceivedMessage(
+                id="msg-1",
+                whisper_timestamp=datetime.datetime(2024, 1, 1, 12, 0, 0),
+                from_="0xuser",
+                alias="Ali",
+                seen=True,
+                rtl=False,
+                line_count=2,
+                text="hello world",
+                chat_id="chat-1",
+                local_chat_id="local-chat-1",
+                ens_name="alice.eth",
+                display_name="Alice",
+                received_timestamp=datetime.datetime(2024, 1, 1, 12, 0, 0),
+            )
+        )
         session.commit()
 
     with db.session() as session:
@@ -71,12 +73,14 @@ def test_duplicate_primary_key_raises_integrity_error():
 def test_chat_round_trip_via_orm():
     db = _database()
     with db.session() as session:
-        session.add(ReceivedChat(
-            id="chat-1",
-            type="public",
-            name="General",
-            received_timestamp=datetime.datetime(2024, 1, 1, 12, 0, 0),
-        ))
+        session.add(
+            ReceivedChat(
+                id="chat-1",
+                type="public",
+                name="General",
+                received_timestamp=datetime.datetime(2024, 1, 1, 12, 0, 0),
+            )
+        )
         session.commit()
 
     with db.session() as session:

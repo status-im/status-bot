@@ -21,7 +21,6 @@ UVICORN_LOG_CONFIG = {
 
 
 class APIServerModule(BaseModule):
-
     @property
     def module_type(self) -> set[ModuleType]:
         return {ModuleType.SERVICE}

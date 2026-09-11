@@ -14,12 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 class ModuleManager:
-
-    def __init__(self,
-            modules_config: ModulesConfig,
-            account: Account,
-            db: Database,
-            shared_state: dict = None):
+    def __init__(
+        self,
+        modules_config: ModulesConfig,
+        account: Account,
+        db: Database,
+        shared_state: dict = None,
+    ):
         self._modules_config = modules_config
         self._account = account
         self._db = db
@@ -84,11 +85,7 @@ class ModuleManager:
 
         for attr_name in dir(module):
             attr = getattr(module, attr_name)
-            if (
-                isinstance(attr, type)
-                and issubclass(attr, BaseModule)
-                and attr is not BaseModule
-            ):
+            if isinstance(attr, type) and issubclass(attr, BaseModule) and attr is not BaseModule:
                 self._module_classes[module_name] = attr
                 logger.debug(f"Found module class: {module_name}.{attr_name}")
 
@@ -218,10 +215,9 @@ class ModuleManager:
             logger.info(f"Sleeping for {interval} min")
             self._stop_event.wait(interval)
 
-
     def _run_event_listener(self) -> None:
         for event in self._account.signal.listen([EventTypeEnum.MESSAGE.value]):
-            event_type = event.get('type')
+            event_type = event.get("type")
             logger.info(f"Received a {event_type}")
             if self._stop_event.is_set():
                 break

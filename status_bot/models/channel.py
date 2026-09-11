@@ -14,5 +14,3 @@ class Channel(Base):
     can_view = Column(Boolean, nullable=True)
     can_post_reaction = Column(Boolean, nullable=True)
     token_gated = Column(String, nullable=True)
-
-

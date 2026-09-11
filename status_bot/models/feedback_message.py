@@ -2,6 +2,7 @@ from sqlalchemy import Column, String, DateTime
 
 from .base import Base
 
+
 class FeedbackMessage(Base):
     __tablename__ = "feedback_message"
     id = Column(String, primary_key=True)

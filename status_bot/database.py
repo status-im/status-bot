@@ -15,14 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class Database:
-
-    def __init__(self,
-            db_type: str,
-            host: str,
-            port: int,
-            user: str,
-            password: str,
-            name: str):
+    def __init__(self, db_type: str, host: str, port: int, user: str, password: str, name: str):
         self._type = db_type
         self._url = self._build_url(db_type, host, port, user, password, name)
         self._engine = create_engine(self._url)
@@ -37,13 +30,9 @@ class Database:
         Base.metadata.create_all(self.__bind(schema_name), tables=tables)
         logger.info(f"Database tables initialized in schema {schema_name or 'default'}")
 
-    def _build_url(self,
-            db_type: str,
-            host: str,
-            port: int,
-            user: str,
-            password: str,
-            name: str) -> str:
+    def _build_url(
+        self, db_type: str, host: str, port: int, user: str, password: str, name: str
+    ) -> str:
         if db_type == "postgres":
             return f"postgresql://{user}:{password}@{host}:{port}/{name}"
         elif db_type == "sqlite":
@@ -79,11 +68,13 @@ class Database:
     def close(self):
         self._engine.dispose()
 
-    def insert(self,
+    def insert(
+        self,
         data: pd.DataFrame,
         table_name: str,
         schema_name: str,
-        json_columns: Optional[list] = None):
+        json_columns: Optional[list] = None,
+    ):
         if len(data) == 0:
             return
 

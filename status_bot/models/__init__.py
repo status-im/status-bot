@@ -6,6 +6,13 @@ from .contact_request import ContactRequest
 from .feedback_message import FeedbackMessage
 
 __all__ = [
-    "Base", "namespace", "model_by_table", "ReceivedMessage", "ReceivedChat",
-    "RawCommunityInfo", "RawMessage", "ContactRequest", "FeedbackMessage"
+    "Base",
+    "namespace",
+    "model_by_table",
+    "ReceivedMessage",
+    "ReceivedChat",
+    "RawCommunityInfo",
+    "RawMessage",
+    "ContactRequest",
+    "FeedbackMessage",
 ]

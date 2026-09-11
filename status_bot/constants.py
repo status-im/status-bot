@@ -24,9 +24,11 @@ _CHAT_DETERMINISTIC_COLUMNS = [
     "name",
 ]
 
+
 class EventTypeEnum(Enum):
     MESSAGE = "messages.new"
     LOCAL_NOTIFICATION = "local-notifications"
+
 
 class NotificationCategoryEnum(Enum):
     CONTACT_REQUEST = "contactRequest"

@@ -15,11 +15,12 @@ class AddContactRequest(BaseModel):
 class SendMessageRequest(BaseModel):
     text: str
 
+
 class SendRequestCommunityRequest(BaseModel):
     url: str
 
-class MessagingModule(BaseModule):
 
+class MessagingModule(BaseModule):
     @property
     def module_type(self) -> set[ModuleType]:
         return {ModuleType.SERVICE}
@@ -104,8 +105,8 @@ class MessagingModule(BaseModule):
             request_time = account.send_request_community(payload.url)
             if not request_time:
                 raise HTTPException(
-                        status_code=400,
-                        detail="Error when trying to send the community request")
+                    status_code=400, detail="Error when trying to send the community request"
+                )
             return {"status": "request send", "request_time": request_time}
 
     def execute(self):

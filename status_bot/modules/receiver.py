@@ -26,13 +26,10 @@ def build_model_rows(
     pepper: str = "",
 ) -> list:
     timestamp_columns = {
-        column.name
-        for column in model.__table__.columns
-        if isinstance(column.type, DateTime)
+        column.name for column in model.__table__.columns if isinstance(column.type, DateTime)
     }
     column_to_attribute = {
-        attribute.expression.name: attribute.key
-        for attribute in model.__mapper__.column_attrs
+        attribute.expression.name: attribute.key for attribute in model.__mapper__.column_attrs
     }
 
     rows = []
@@ -50,9 +47,7 @@ def build_model_rows(
                 kwargs[column_to_attribute[name]] = None
                 continue
             if name in deterministic_columns:
-                kwargs[column_to_attribute[name]] = to_hmac_sha256_hash(
-                    str(value), pepper
-                )
+                kwargs[column_to_attribute[name]] = to_hmac_sha256_hash(str(value), pepper)
             elif name in timestamp_columns and isinstance(value, (int, float)):
                 kwargs[column_to_attribute[name]] = datetime.datetime.fromtimestamp(
                     value / TIMESTAMP_DIVISOR
@@ -65,7 +60,6 @@ def build_model_rows(
 
 
 class ReceiverModule(BaseModule):
-
     @property
     def module_type(self) -> set[ModuleType]:
         return {ModuleType.EVENT}
@@ -137,9 +131,5 @@ class ReceiverModule(BaseModule):
                 session.commit()
             except IntegrityError:
                 session.rollback()
-                logger.warning(
-                    f"Receiver: duplicate rows skipped in {model.__tablename__}"
-                )
-        logger.info(
-            f"Receiver: stored {len(rows)} record(s) in {model.__tablename__}"
-        )
+                logger.warning(f"Receiver: duplicate rows skipped in {model.__tablename__}")
+        logger.info(f"Receiver: stored {len(rows)} record(s) in {model.__tablename__}")

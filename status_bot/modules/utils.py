@@ -28,12 +28,14 @@ def camel_to_snake(name: str) -> str:
 def to_sha256_hash(value: str) -> str:
     return sha256(value.encode()).hexdigest()
 
+
 def remove_public_key(text: str) -> str:
     """
     Remove any `@public-key` patterns from text message
     """
     pattern = re.compile(r"(?<![\w.])@0x[0-9a-fA-F]{130}")
     return pattern.sub("@anon", text)
+
 
 def to_hmac_sha256_hash(value: str, pepper: str = "") -> str:
     global _PEPPER_WARNED
@@ -71,12 +73,12 @@ def download_image(url: str, image_path: str):
 
     # Configure retry logic for transient 503 errors
     retries = Retry(total=3, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
-    session.mount('https://', HTTPAdapter(max_retries=retries))
+    session.mount("https://", HTTPAdapter(max_retries=retries))
     try:
         logger.debug(f"Image URL {url}")
         response = session.get(url, verify=False, stream=True, timeout=10)
         logger.debug("Starting the download")
-        with open(image_path, 'wb') as f:
+        with open(image_path, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
                 if chunk:
                     f.write(chunk)
@@ -90,7 +92,7 @@ def download_image(url: str, image_path: str):
         raise ImageDownloadFailedException(f"Failed to download image from {url}")
 
 
-def is_group_chat_message(event_data: dict, chat_id: Optional[str] = None)-> bool:
+def is_group_chat_message(event_data: dict, chat_id: Optional[str] = None) -> bool:
     """
     Determind if the message is from a group chat
     Parameters:
@@ -102,7 +104,7 @@ def is_group_chat_message(event_data: dict, chat_id: Optional[str] = None)-> boo
     chats = event_data.get("chats", [])
     if len(chats) == 0:
         return False
-    if chats[0].get("chatType") != 3 :
+    if chats[0].get("chatType") != 3:
         return False
     if not chat_id:
         return True
