@@ -10,6 +10,14 @@ DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 _NOISE_LOGGRS = ("sqlalchemy.engine", "urllib3", "websockets")
 
+SECRET_KEYS = [
+    "password",
+    "mnemonic_phrase",
+    "infura_token",
+    "coingecko_api_key",
+    "bot_hash_pepper",
+]
+
 
 def _level_value(level: str) -> int:
     value = getattr(logging, level.upper(), None)
@@ -52,14 +60,9 @@ class RedactFilter(logging.Filter):
 
         args = record.args
         if isinstance(args, dict):
-            record.args = {
-                k: self._redact(v) if isinstance(v, str) else v
-                for k, v in args.items()
-            }
+            record.args = {k: self._redact(v) if isinstance(v, str) else v for k, v in args.items()}
         elif isinstance(args, (tuple, list)):
-            record.args = type(args)(
-                self._redact(a) if isinstance(a, str) else a for a in args
-            )
+            record.args = type(args)(self._redact(a) if isinstance(a, str) else a for a in args)
         return True
 
     def _redact(self, value: str) -> str:
@@ -92,7 +95,7 @@ def _collect_secrets(config) -> list[str]:
     secrets = []
     bot = getattr(config, "bot", None)
     if bot is not None:
-        for attr in ("password", "mnemonic_phrase", "infura_token", "coingecko_api_key", "bot_hash_pepper"):
+        for attr in SECRET_KEYS:
             value = getattr(bot, attr, "")
             if value:
                 secrets.append(value)

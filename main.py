@@ -13,25 +13,21 @@ from status_bot.modules.manager import ModuleManager
 
 logger = logging.getLogger("status_bot.main")
 
+
 def create_bot(config: Config, project_root: str) -> Account:
-    account = Account(
-        **config.backend.model_dump(),
-        volume_folder=os.path.dirname(__file__)
-    )
+    account = Account(**config.backend.model_dump(), volume_folder=os.path.dirname(__file__))
     account.login(
         config.bot.password,
         name=config.bot.name,
         mnemonic=config.bot.mnemonic_phrase,
         infura_token=config.bot.infura_token,
         alchemy_token=config.bot.alchemy_token,
-        coingecko_api_key=config.bot.coingecko_api_key
+        coingecko_api_key=config.bot.coingecko_api_key,
     )
 
     logger.info(f"account loaded compressed key : {account.info['compressed_key']}")
     if account.info["compressed_key"] != config.bot.chat_key:
-        raise Exception(
-            "Target compressed key and logged in chat key are different."
-        )
+        raise Exception("Target compressed key and logged in chat key are different.")
 
     account.bio = config.bot.bio
     profile_path = os.path.join(project_root, config.bot.profil_picture_path)
@@ -44,6 +40,7 @@ def create_bot(config: Config, project_root: str) -> Account:
     )
     return account
 
+
 def init_database(config: Config) -> Database:
     return Database(
         db_type=config.database.type,
@@ -51,16 +48,14 @@ def init_database(config: Config) -> Database:
         port=config.database.port,
         user=config.database.user,
         password=config.database.password,
-        name=config.database.name
+        name=config.database.name,
     )
 
 
 def main():
     setup_logging()
 
-    parser = argparse.ArgumentParser(
-        description="Status Bot - Modular monitoring framework"
-    )
+    parser = argparse.ArgumentParser(description="Status Bot - Modular monitoring framework")
     parser.add_argument(
         "--config",
         default=os.path.join(os.path.dirname(__file__), "config.yaml"),
@@ -96,12 +91,14 @@ def main():
         sys.exit(1)
 
     db = None
-    has_database = all([
-        config.database.host,
-        config.database.user,
-        config.database.password,
-        config.database.name,
-    ])
+    has_database = all(
+        [
+            config.database.host,
+            config.database.user,
+            config.database.password,
+            config.database.name,
+        ]
+    )
 
     if has_database:
         try:
@@ -124,7 +121,7 @@ def main():
     manager.load_modules()
 
     if db is not None:
-        db.create_tables(config.database.schema)
+        db.create_tables(config.database.schema_name)
 
     start_prometheus(config.metrics, manager, config.bot.name)
 
@@ -139,10 +136,7 @@ def main():
     signal.signal(signal.SIGINT, handle_sigterm)
 
     if manager.module_names:
-        logger.info(
-            f"Starting {len(manager.module_names)} module(s): "
-            f"{manager.module_names}"
-        )
+        logger.info(f"Starting {len(manager.module_names)} module(s): {manager.module_names}")
         manager.start_all()
 
         try:

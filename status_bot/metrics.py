@@ -2,7 +2,7 @@ import logging
 
 from status_bot.config import MetricsConfig
 from status_bot.modules.manager import ModuleManager
-from prometheus_client import start_http_server, Gauge, Counter
+from prometheus_client import start_http_server, Gauge
 
 logger = logging.getLogger(__name__)
 
@@ -15,15 +15,7 @@ def start_prometheus(metrics_config: MetricsConfig, manager: ModuleManager, acco
     health = Gauge("status_bot_health", "Bot health status")
     version = Gauge("status_bot_version", "Bot version", ["version", "name"])
 
-    module_loaded = Gauge(
-        "status_bot_module_loaded", "Module loaded", ["module"]
-    )
-    module_errors = Counter(
-        "status_bot_module_errors_total", "Module errors", ["module"]
-    )
-    module_restarts = Counter(
-        "status_bot_module_restarts_total", "Module restarts", ["module"]
-    )
+    module_loaded = Gauge("status_bot_module_loaded", "Module loaded", ["module"])
 
     health.set(1)
     version.labels(version="1.0.0", name=account_name).set(1)

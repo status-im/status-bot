@@ -4,9 +4,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from status_sdk import Account
 from status_bot import Database
-import threading, logging
-
-from prometheus_client import Counter, Gauge
+import threading
+import logging
 
 
 class ModuleType(Enum):
@@ -43,7 +42,6 @@ class ModuleContext:
 
 
 class BaseModule(ABC):
-
     def __init__(self, ctx: ModuleContext):
         self._ctx = ctx
         self.__logger = logging.getLogger(self.__class__.__name__)
@@ -79,16 +77,14 @@ class BaseModule(ABC):
 
     @property
     @abstractmethod
-    def module_type(self) -> set[ModuleType]:
-        ...
+    def module_type(self) -> set[ModuleType]: ...
 
     @property
     def name(self) -> str:
         return self._ctx.config.name
 
     @abstractmethod
-    def execute(self) -> Any:
-        ...
+    def execute(self) -> Any: ...
 
     def on_start(self) -> None:
         self.logger.info(f"Starting module {self.__class__.__name__}")
@@ -109,13 +105,11 @@ class BaseModule(ABC):
 
     def _verify_mandatory_config(self, config_fields: list[str]):
         missing_field = []
-        for field in config_fields:
-            if self.ctx.config.settings.get(field) is None:
-                missing_field.append(field)
+        for config_field in config_fields:
+            if self.ctx.config.settings.get(config_field) is None:
+                missing_field.append(config_field)
         if len(missing_field) > 0:
-            raise ValueError(
-                    f"Missing fields in the config module: {', '.join(missing_field)}")
-
+            raise ValueError(f"Missing fields in the config module: {', '.join(missing_field)}")
 
     @property
     def is_running(self) -> bool:

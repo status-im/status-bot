@@ -132,7 +132,7 @@ Supports **Postgres** and **SQLite** (SQLite via `type: sqlite`, where `name` is
 | `user` | `str` | `""` | `DATABASE__USER` | Database username (Postgres) |
 | `password` | `str` | `""` | `DATABASE__PASSWORD` | Database password (Postgres) |
 | `name` | `str` | `""` | `DATABASE__NAME` | Database name (Postgres) or file path (SQLite) |
-| `schema` | `str` | `"public"` | `DATABASE__SCHEMA` | Database schema (Postgres) |
+| `schema_name` | `str` | `"public"` | `DATABASE__SCHEMA` | Database schema (Postgres) |
 | `tables` | `dict` | `{}` | — | Mapping of data type to table name |
 
 Postgres example:

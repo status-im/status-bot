@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Boolean, Column, DateTime, Integer, String
+from sqlalchemy import Boolean, Column, String
 
 from .base import Base
 
@@ -14,5 +14,3 @@ class Channel(Base):
     can_view = Column(Boolean, nullable=True)
     can_post_reaction = Column(Boolean, nullable=True)
     token_gated = Column(String, nullable=True)
-
-

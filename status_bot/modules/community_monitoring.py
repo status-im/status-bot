@@ -1,16 +1,20 @@
 from status_bot.modules.base import BaseModule, ModuleType
 from status_bot.modules import utils
-from status_bot import models
+from status_bot.models import RawMessage, RawCommunityInfo
 from typing import Union
 from status_sdk import Community
 import pandas as pd
-import datetime, sqlalchemy
+import datetime
+import sqlalchemy
+import logging
 
+logger = logging.getLogger(__name__)
 try:
     from detoxify import Detoxify
     import torch
-except:
-    pass
+except Exception as e:
+    logger.warning(f"Error import detoxify libs {e}")
+
 
 class CommunitiesMonitoring(BaseModule):
     """
@@ -46,40 +50,39 @@ class CommunitiesMonitoring(BaseModule):
 
     def on_start(self):
         try:
-            balance = self.account["GBP"]
-            is_wallet_set = True
-        except:
-            is_wallet_set = False
-
-        if not is_wallet_set:
-            self.logger.warning("There was an error with loading wallet functionalities! Token gated communities will not be available! Only non token based communities will work!")
+            # Assert the connection to Wallet functionnalites for fetching data from
+            # Token Gated communties
+            self.account["USD"]
+        except Exception:
+            self.logger.error(
+                "Error with wallet functionalities! Token gated communities will not be available"
+            )
 
         self.__columns = {**self.COLUMNS}
         try:
             device = "cuda" if torch.cuda.is_available() else "cpu"
             self._model = Detoxify("original", device=device)
-            self.__columns.update({
-                key: False
-                for key in self._model.predict("test").keys()
-            })
+            self.__columns.update({key: False for key in self._model.predict("test").keys()})
             self.logger.info(f"Initialized Detoxify on {device}")
-        except:
+        except Exception:
             self._model = None
-            self.logger.info("Skipping toxic comment classification. PyPi library `detoxify` not found...")
+            self.logger.warning("Skipping toxic comment classification, detoxify initialized")
 
         if not self.settings.get("detoxify", False):
             self._model = None
 
         if self.ctx.db is not None:
-            self.ctx.db.create_tables(self.db_schema, tables=[
-                models.RawMessage.__table__,
-                models.RawCommunityInfo.__table__,
-            ])
+            self.ctx.db.create_tables(
+                self.db_schema,
+                tables=[
+                    RawMessage.__table__,
+                    RawCommunityInfo.__table__,
+                ],
+            )
 
         super().on_start()
 
     def execute(self):
-
         community_names = self.settings.get("communities", [])
         if not community_names:
             self.logger.warning("No communities passed in config.yaml...")
@@ -87,17 +90,14 @@ class CommunitiesMonitoring(BaseModule):
 
         now = datetime.datetime.now()
         latest_dates = self.get_latest_dates()
-        batch: dict[str, list[Union[dict, pd.DataFrame]]] = {
-            "messages": [],
-            "community": []
-        }
+        batch: dict[str, list[Union[dict, pd.DataFrame]]] = {"messages": [], "community": []}
         for info in self.account.communities:
             community = Community(self.account, info["id"])
             if community.name not in community_names:
                 continue
 
             batch["community"].append(
-                models.RawCommunityInfo(**info, batch_timestamp = datetime.datetime.now())
+                RawCommunityInfo(**info, batch_timestamp=datetime.datetime.now())
             )
             messages = self.get_messages(community, now, latest_dates)
             self.logger.info(f"Community '{community.name}' has {len(messages)} message(s)")
@@ -110,7 +110,6 @@ class CommunitiesMonitoring(BaseModule):
             batch["messages"] = pd.concat(batch["messages"])
 
         for batch_type, data in batch.items():
-
             if len(data) == 0:
                 continue
 
@@ -120,38 +119,31 @@ class CommunitiesMonitoring(BaseModule):
                     session.commit()
                 continue
 
-            records = data.assign(batch_timestamp=datetime.datetime.now())\
-                            .to_dict("records")
+            records = data.assign(batch_timestamp=datetime.datetime.now()).to_dict("records")
 
             with self.ctx.db.session(self.db_schema) as session:
-                session.execute(sqlalchemy.insert(models.RawMessage.__table__), records)
+                session.execute(sqlalchemy.insert(RawMessage.__table__), records)
                 session.commit()
 
     def get_latest_dates(self) -> dict[str, pd.Timestamp]:
         """
         Get the latest date for every channel
         """
-        if self.ctx.db is None:
-            return {}
-
         query = sqlalchemy.select(
-            models.RawMessage.chat_id,
-            sqlalchemy.func.max(models.RawMessage.whisper_timestamp),
-        ).group_by(models.RawMessage.chat_id)
+            RawMessage.chat_id,
+            sqlalchemy.func.max(RawMessage.whisper_timestamp),
+        ).group_by(RawMessage.chat_id)
 
         try:
             with self.ctx.db.session(self.db_schema) as session:
-                return {
-                    chat_id: pd.Timestamp(latest)
-                    for chat_id, latest in session.execute(query)
-                }
+                return {chat_id: pd.Timestamp(latest) for chat_id, latest in session.execute(query)}
         except Exception as e:
             self.logger.exception(f"Could not read history from {self.db_schema}... {e}")
             return {}
 
-
-
-    def get_messages(self, community: Community, now: datetime.datetime, latest_dates: dict[str, pd.Timestamp]) -> pd.DataFrame:
+    def get_messages(
+        self, community: Community, now: datetime.datetime, latest_dates: dict[str, pd.Timestamp]
+    ) -> pd.DataFrame:
         data = []
         # (1) Get raw messages
         for channel_info in community.channels:
@@ -180,10 +172,12 @@ class CommunitiesMonitoring(BaseModule):
         # (2) Add additional metrics
         if self._model:
             final = final.merge(
-                final["text"].apply(lambda text: pd.Series(self._model.predict(utils.remove_public_key(text)))),
+                final["text"].apply(
+                    lambda text: pd.Series(self._model.predict(utils.remove_public_key(text)))
+                ),
                 "left",
                 left_index=True,
-                right_index=True
+                right_index=True,
             )
 
         # (3) Prepare for database upload
@@ -205,8 +199,8 @@ class CommunitiesMonitoring(BaseModule):
             final["source"] = "status"
 
         final = final[list(self.__columns.keys()) + ["source"]].assign(
-            deleted = final["deleted"].fillna(False),
-            seen = final["seen"].fillna(False),
+            deleted=final["deleted"].fillna(False),
+            seen=final["seen"].fillna(False),
         )
 
         return final.copy()
