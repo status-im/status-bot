@@ -15,7 +15,11 @@ logger = logging.getLogger(__name__)
 
 class ModuleManager:
 
-    def __init__(self, modules_config: ModulesConfig, account: Account, db: Database, shared_state: dict = None):
+    def __init__(self,
+            modules_config: ModulesConfig,
+            account: Account,
+            db: Database,
+            shared_state: dict = None):
         self._modules_config = modules_config
         self._account = account
         self._db = db

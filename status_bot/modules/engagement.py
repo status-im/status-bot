@@ -53,7 +53,8 @@ def get_response_reply_if_exist(db_session: Session, messages: list[dict]) -> Op
     )
     if msg_response_to:
         logger.debug(f"replying to message {msg_response_to}")
-        reply_to = db_session.query(FeedbackMessage).filter(FeedbackMessage.reply_chat_id==msg_response_to).first()
+        reply_to = db_session.query(FeedbackMessage).filter(
+                FeedbackMessage.reply_chat_id==msg_response_to).first()
         logger.debug(f"Original Message here {reply_to}")
         if reply_to:
             return reply_to.reply_chat_id
@@ -94,7 +95,7 @@ class Engagement(BaseModule):
             self.group_chat = GroupChat(
                     account=self.account,
                     chat_id=group_chat_config.get("group_id"))
-        logger.info(f"The bot will detect messages with the following keywords {self.settings.get('feedback_keywords', [])}")
+        logger.info(f"Feedback keyword configured are: {self.settings.get('feedback_keywords')}")
 
 
 
@@ -113,7 +114,8 @@ class Engagement(BaseModule):
             request_timestamp=datetime.fromtimestamp(
                 message.get("timestamp", 0) / 1_000
             ),
-            is_new_user=message.get("text") == self.settings.get("new_user_message_contact_request", ""))
+            is_new_user=message.get("text") == self.settings.get(
+                "new_user_message_contact_request", ""))
         self._counter.labels(type="received_request").inc()
         self.account.add_contact(
             public_key=new_contact.public_key,
@@ -185,7 +187,11 @@ class Engagement(BaseModule):
         feedback_keywords = self.settings.get("feedback_keywords", [])
         return any(kw in messages[0].get("text").lower() for kw in feedback_keywords)
 
-    def send_message(self, chat_id: str, orignal_message: dict, msg_content: str, reply_id: Optional[str]):
+    def send_message(self,
+            chat_id: str,
+            orignal_message: dict,
+            msg_content: str,
+            reply_id: Optional[str]):
         """
             Send message to either the group chat or the user.
             Download an image with there is an image to transfer.
@@ -287,8 +293,9 @@ class Engagement(BaseModule):
         if responseTo is None or responseTo == "":
             logger.debug("The message isn't a reply, ignoring it")
             return
-        original_message: FeedbackMessage = db_session.query(FeedbackMessage).filter(FeedbackMessage.group_chat_message_id==responseTo).first()
-        if original_message == None:
+        original_message: FeedbackMessage = db_session.query(FeedbackMessage).filter(
+                FeedbackMessage.group_chat_message_id==responseTo).first()
+        if original_message is None:
             logger.warning(f"No original message found for id {responseTo}")
             self._counter.labels(type="original-not-found").inc()
             return
@@ -359,7 +366,8 @@ class Engagement(BaseModule):
         msgs = db_session.query(FeedbackMessage).filter(
             FeedbackMessage.request_timestamp < threshold
         ).all()
-        logger.info(f"Deleting {len(msgs)} messages having reach the retention time of {retention_time}")
+        logger.info(
+            f"Deleting {len(msgs)} messages having reach the retention time of {retention_time}")
         for msg in msgs:
             db_session.delete(msg)
             self._counter.labels(type="periodic-message-del").inc()

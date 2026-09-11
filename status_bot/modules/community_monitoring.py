@@ -1,17 +1,19 @@
 from status_bot.modules.base import BaseModule, ModuleType
 from status_bot.modules import utils
-from status_bot import models
+from status_bot.models import RawMessage, RawCommunityInfo
 from typing import Union
 from status_sdk import Community
 import pandas as pd
 import datetime
 import sqlalchemy
+import logging
 
+logger = logging.getLogger(__name__)
 try:
     from detoxify import Detoxify
     import torch
-except:
-    pass
+except Exception as e:
+    logger.warning(f"Error import detoxify libs {e}")
 
 class CommunitiesMonitoring(BaseModule):
     """
@@ -47,13 +49,12 @@ class CommunitiesMonitoring(BaseModule):
 
     def on_start(self):
         try:
-            balance = self.account["GBP"]
-            is_wallet_set = True
-        except:
-            is_wallet_set = False
-
-        if not is_wallet_set:
-            self.logger.warning("There was an error with loading wallet functionalities! Token gated communities will not be available! Only non token based communities will work!")
+            # Assert the connection to Wallet functionnalites for fetching data from
+            # Token Gated communties
+            self.account["USD"]
+        except Exception:
+            self.logger.error(
+                "Error with wallet functionalities! Token gated communities will not be available")
 
         self.__columns = {**self.COLUMNS}
         try:
@@ -64,17 +65,17 @@ class CommunitiesMonitoring(BaseModule):
                 for key in self._model.predict("test").keys()
             })
             self.logger.info(f"Initialized Detoxify on {device}")
-        except:
+        except Exception:
             self._model = None
-            self.logger.info("Skipping toxic comment classification. PyPi library `detoxify` not found...")
+            self.logger.warning("Skipping toxic comment classification, detoxify initialized")
 
         if not self.settings.get("detoxify", False):
             self._model = None
 
         if self.ctx.db is not None:
             self.ctx.db.create_tables(self.db_schema, tables=[
-                models.RawMessage.__table__,
-                models.RawCommunityInfo.__table__,
+                RawMessage.__table__,
+                RawCommunityInfo.__table__,
             ])
 
         super().on_start()
@@ -98,7 +99,7 @@ class CommunitiesMonitoring(BaseModule):
                 continue
 
             batch["community"].append(
-                models.RawCommunityInfo(**info, batch_timestamp = datetime.datetime.now())
+                RawCommunityInfo(**info, batch_timestamp = datetime.datetime.now())
             )
             messages = self.get_messages(community, now, latest_dates)
             self.logger.info(f"Community '{community.name}' has {len(messages)} message(s)")
@@ -125,20 +126,17 @@ class CommunitiesMonitoring(BaseModule):
                             .to_dict("records")
 
             with self.ctx.db.session(self.db_schema) as session:
-                session.execute(sqlalchemy.insert(models.RawMessage.__table__), records)
+                session.execute(sqlalchemy.insert(RawMessage.__table__), records)
                 session.commit()
 
     def get_latest_dates(self) -> dict[str, pd.Timestamp]:
         """
         Get the latest date for every channel
         """
-        if self.ctx.db is None:
-            return {}
-
         query = sqlalchemy.select(
-            models.RawMessage.chat_id,
-            sqlalchemy.func.max(models.RawMessage.whisper_timestamp),
-        ).group_by(models.RawMessage.chat_id)
+            RawMessage.chat_id,
+            sqlalchemy.func.max(RawMessage.whisper_timestamp),
+        ).group_by(RawMessage.chat_id)
 
         try:
             with self.ctx.db.session(self.db_schema) as session:
@@ -152,7 +150,11 @@ class CommunitiesMonitoring(BaseModule):
 
 
 
-    def get_messages(self, community: Community, now: datetime.datetime, latest_dates: dict[str, pd.Timestamp]) -> pd.DataFrame:
+    def get_messages(self,
+            community: Community,
+            now: datetime.datetime,
+            latest_dates: dict[str, pd.Timestamp]
+            ) -> pd.DataFrame:
         data = []
         # (1) Get raw messages
         for channel_info in community.channels:
@@ -181,7 +183,8 @@ class CommunitiesMonitoring(BaseModule):
         # (2) Add additional metrics
         if self._model:
             final = final.merge(
-                final["text"].apply(lambda text: pd.Series(self._model.predict(utils.remove_public_key(text)))),
+                final["text"].apply(lambda text: pd.Series(
+                    self._model.predict(utils.remove_public_key(text)))),
                 "left",
                 left_index=True,
                 right_index=True

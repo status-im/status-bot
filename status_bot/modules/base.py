@@ -109,9 +109,9 @@ class BaseModule(ABC):
 
     def _verify_mandatory_config(self, config_fields: list[str]):
         missing_field = []
-        for field in config_fields:
-            if self.ctx.config.settings.get(field) is None:
-                missing_field.append(field)
+        for config_field in config_fields:
+            if self.ctx.config.settings.get(config_field) is None:
+                missing_field.append(config_field)
         if len(missing_field) > 0:
             raise ValueError(
                     f"Missing fields in the config module: {', '.join(missing_field)}")

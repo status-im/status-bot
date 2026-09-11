@@ -103,7 +103,9 @@ class MessagingModule(BaseModule):
                 raise HTTPException(status_code=400, detail="Community url is required")
             request_time = account.send_request_community(payload.url)
             if not request_time:
-                raise HTTPException(status_code=400, detail="Error when trying to send the community request")
+                raise HTTPException(
+                        status_code=400,
+                        detail="Error when trying to send the community request")
             return {"status": "request send", "request_time": request_time}
 
     def execute(self):
