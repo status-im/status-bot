@@ -4,6 +4,8 @@ import logging
 from typing import Type
 from pathlib import Path
 
+from prometheus_client import Counter
+
 from .base import BaseModule, ModuleConfig, ModuleContext, ModuleType
 from status_bot.config import ModulesConfig
 from status_bot.constants import EventTypeEnum
@@ -30,6 +32,13 @@ class ModuleManager:
         self._stop_event = threading.Event()
         self._shared_state = shared_state or {}
         self._event_modules: dict[str, BaseModule] = {}
+
+        self._execution_error = Counter(
+            "status_bot_module_execution_error", "Number of execution error per module", ["module"]
+        )
+        self._periodic_execution = Counter(
+            "status_bot_module_execution", "Number of execution per module", ["module"]
+        )
 
     @property
     def modules(self) -> dict[str, BaseModule]:
@@ -211,7 +220,12 @@ class ModuleManager:
     def _run_periodic(self, module: BaseModule) -> None:
         interval = module.interval * 60
         while not self._stop_event.is_set():
-            module.execute()
+            try:
+                module.execute()
+                self._periodic_execution.labels(module=module.name).inc()
+            except Exception as e:
+                self._execution_error.labels(module=module.name).inc()
+                logger.error(f"Error when running the module {module.name}: {e}", exc_info=True)
             logger.info(f"Sleeping for {interval} min")
             self._stop_event.wait(interval)
 
