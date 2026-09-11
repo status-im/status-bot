@@ -16,6 +16,38 @@ Modules can declare one or more types. The behavior is composed from the declare
 - `PERIODIC | EVENT`: Runs `execute()` periodically and receives signal events
 - `EVENT | SERVICE`: Listens to events while running a blocking service
 
+## Event types
+
+A module whose `module_type` includes `ModuleType.EVENT` also declares `event_type`, an `EventType` enum value that picks which account listener the `ModuleManager` drives it with:
+
+```python
+from status_bot.modules.base import BaseModule, ModuleType, EventType
+
+class MentionsModule(BaseModule):
+
+    @property
+    def module_type(self) -> set[ModuleType]:
+        return {ModuleType.EVENT}
+
+    @property
+    def event_type(self) -> EventType:
+        return EventType.MESSAGE_MENTIONS
+
+    def on_event(self, event):
+        ...
+```
+
+`event_type` maps to a listener as follows:
+
+| `EventType` | Listener | Return type |
+|---|---|---|
+| `CONTACT_REQUESTS` | `account.listen_contact_requests` | `Generator[models.ContactRequest, None, None]` |
+| `MESSAGE_MENTIONS` | `account.listen_message_mentions` | `Generator[models.Message, None, None]` |
+| `MESSAGES` | `account.listen_messages` | `Generator[models.Message, None, None]` |
+| `RAW_SIGNALS` | `account.signal.listen` | Unfiltered WebSocket signal `dict` (the raw `{"type", "error_message", "event"}` payload) |
+
+`BaseModule.event_type` defaults to `None`, so only override it on modules whose `module_type` includes `ModuleType.EVENT`. An `EVENT` module that leaves `event_type` unset fails when `ModuleManager` looks it up in the mapping above — always pair `ModuleType.EVENT` with an explicit `EventType`.
+
 ## BaseModule API
 
 ```python
