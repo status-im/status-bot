@@ -110,4 +110,7 @@ class MessagingModule(BaseModule):
             return {"status": "request send", "request_time": request_time}
 
     def execute(self):
-        self.ctx.stop_event.wait()
+        pass
+
+    def on_event(self, event_type: str, event: dict) -> None:
+        pass

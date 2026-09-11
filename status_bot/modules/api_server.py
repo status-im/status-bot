@@ -73,3 +73,6 @@ class APIServerModule(BaseModule):
     def on_stop(self):
         if self._server:
             self._server.should_exit = True
+
+    def on_event(self, event_type: str, event: dict) -> None:
+        pass

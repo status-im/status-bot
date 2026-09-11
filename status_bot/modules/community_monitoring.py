@@ -208,6 +208,9 @@ class CommunitiesMonitoring(BaseModule):
 
         return final.copy()
 
+    def on_event(self, event_type: str, event: dict):
+        pass
+
     def register_metrics(self) -> None:
         self._msg_per_community_counter = Counter(
             "status_bot_community_monitoring_nb_message", "Message per community", ["community"]

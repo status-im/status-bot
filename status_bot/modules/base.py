@@ -4,8 +4,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 from status_sdk import Account
 from status_bot import Database
+from status_bot.exceptions import MandatoryModuleParameterMissingException
 import threading
 import logging
+from prometheus_client import Histogram
 
 
 class ModuleType(Enum):
@@ -39,6 +41,14 @@ class ModuleContext:
     db: Optional[Database] = None
     shared_state: dict = field(default_factory=dict)
     stop_event: Optional[threading.Event] = None
+
+
+MODULE_PERIODIC_EXECUTION_TIME = Histogram(
+    "status_bot_periodic_execution_duration_seconds", "Time spent executing jobs", ["module"]
+)
+MODULE_EVENT_EXECUTION_TIME = Histogram(
+    "status_bot_event_execution_duration_seconds", "Time spent executing jobs", ["module"]
+)
 
 
 class BaseModule(ABC):
@@ -83,6 +93,14 @@ class BaseModule(ABC):
     def name(self) -> str:
         return self._ctx.config.name
 
+    def run(self):
+        with MODULE_PERIODIC_EXECUTION_TIME.labels(module=self.name).time():
+            return self.execute()
+
+    def run_event(self, event_type: str, event: dict):
+        with MODULE_EVENT_EXECUTION_TIME.labels(module=self.name).time():
+            return self.on_event(event_type, event)
+
     @abstractmethod
     def execute(self) -> Any: ...
 
@@ -92,8 +110,8 @@ class BaseModule(ABC):
     def on_stop(self) -> None:
         pass
 
-    def on_event(self, event_type: str, event: dict) -> Any:
-        return None
+    @abstractmethod
+    def on_event(self, event_type: str, event: dict) -> None: ...
 
     def register_metrics(self) -> None:
         """Override in subclasses to register custom Prometheus metrics.
@@ -104,12 +122,14 @@ class BaseModule(ABC):
         pass
 
     def _verify_mandatory_config(self, config_fields: list[str]):
-        missing_field = []
+        missing_fields = []
         for config_field in config_fields:
             if self.ctx.config.settings.get(config_field) is None:
-                missing_field.append(config_field)
-        if len(missing_field) > 0:
-            raise ValueError(f"Missing fields in the config module: {', '.join(missing_field)}")
+                missing_fields.append(config_field)
+        if len(missing_fields) > 0:
+            raise MandatoryModuleParameterMissingException(
+                msg="Missing fields in the config module", missing_fields=missing_fields
+            )
 
     @property
     def is_running(self) -> bool:

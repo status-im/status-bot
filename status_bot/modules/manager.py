@@ -32,12 +32,16 @@ class ModuleManager:
         self._stop_event = threading.Event()
         self._shared_state = shared_state or {}
         self._event_modules: dict[str, BaseModule] = {}
+        self._max_module_retries = 3
 
         self._execution_error = Counter(
             "status_bot_module_execution_error", "Number of execution error per module", ["module"]
         )
         self._periodic_execution = Counter(
             "status_bot_module_execution", "Number of execution per module", ["module"]
+        )
+        self._start_try = Counter(
+            "status_bot_module_start", "Number of Start for per module", ["module"]
         )
 
     @property
@@ -121,7 +125,7 @@ class ModuleManager:
                 name=module_name,
                 enabled=True,
                 interval=module_settings.get("interval", 60),
-                max_retries=module_settings.get("max_retries", 3),
+                max_retries=self._max_module_retries,
                 backoff_seconds=module_settings.get("backoff_seconds", 30),
                 settings=module_settings,
             )
@@ -176,7 +180,7 @@ class ModuleManager:
 
     def _run_module_wrapper(self, module: BaseModule) -> None:
         retries = 0
-        max_retries = module.ctx.config.max_retries
+        max_retries = self._max_module_retries
         backoff = module.ctx.config.backoff_seconds
 
         while retries <= max_retries and not self._stop_event.is_set():
@@ -202,6 +206,7 @@ class ModuleManager:
                     f"Module '{module.name}' failed ({retries}/{max_retries}): {e}",
                     exc_info=True,
                 )
+                self._start_try.labels(module=module.name).inc()
                 if retries <= max_retries:
                     wait = backoff * (2 ** (retries - 1))
                     logger.info(f"Restarting '{module.name}' in {wait}s...")
@@ -221,7 +226,7 @@ class ModuleManager:
         interval = module.interval * 60
         while not self._stop_event.is_set():
             try:
-                module.execute()
+                module.run()
                 self._periodic_execution.labels(module=module.name).inc()
             except Exception as e:
                 self._execution_error.labels(module=module.name).inc()
