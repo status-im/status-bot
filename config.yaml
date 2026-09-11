@@ -50,7 +50,7 @@ modules:
                 - 1 # Text
             url:
                 discourse: "https://discuss.status.app"
-                community: "https://status.app/c/G4AAAGRgngMUmea2VZcKn0rXyYHD8aLfDhfKwgQjSfIcPp8kbltM_SnmM1mZYyCpzU0LaELQRRnrfDz_Hrf-8ojM-j3ffyYNTcn9sZZx3ef-eMLkNMx3M0M9zN705o8MzMadJCuatPRgUXUB#zQ3shqYasmP7ZHvAWvG1J9hG5XrH2qV7Xs3CFDu3mCRuuXrKk"
+                community: "https://status.app/c/G3QAAMQn9ueHRsR3W5Ouuy25fkA9zyknAIEkCbYAoC04HjyGeQ6X8k45q3GVeyZiksbd38tQ4S_EfhrJKhRV3sDvjhmrCuSoDBIf2QJiEKwAOZipxis8ntNRVyPhC5IoWaEsj9X4P5zw093pcLofZzTV2gM=#zQ3shZeEJqTC1xhGUjxuS4rtHSrhJ8vUYp64v6qWkLpvdy9L9"
 
 metrics:
     enabled: true

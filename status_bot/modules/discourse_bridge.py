@@ -2,6 +2,7 @@ import requests, datetime, time, traceback
 import pandas as pd
 from html_to_markdown import convert as convert_to_markdown
 from status_bot.modules.base import BaseModule, ModuleType
+from status_bot.models import BridgeInfo
 from status_sdk import Community, Channel
 from typing import Optional
 
@@ -139,9 +140,12 @@ class DiscourseBridge(BaseModule):
     def on_start(self):
         self.discourse = Discourse(self.settings["url"]["discourse"], self.settings["api"]["username"], self.settings["api"]["key"])
         self.community = Community(self.account, url=self.settings["url"]["community"])
-        self.table_name = "bridge_info"
         self.discourse_seconds_wait: int = self.settings["delay"]
         self.success_emoji: str = self.settings["emoji_shortname"]
+
+        if self.ctx.db:
+            self.ctx.db.create_tables(self.db_schema, tables=[BridgeInfo.__table__])
+
         super().on_start()
 
     def execute(self):
@@ -180,16 +184,15 @@ class DiscourseBridge(BaseModule):
             if is_new:
                 return pd.DataFrame()
 
-            query = f"""
-            SELECT id, message_id
-            FROM {self.db_schema}.{self.table_name}
-            WHERE topic_id = {topic['id']}
-            """
-            return pd.DataFrame(self.ctx.db.fetch_all(query))
+            rows = self.ctx.db.query(BridgeInfo, self.db_schema)\
+                                .filter(BridgeInfo.topic_id == topic["id"])\
+                                .all()
+            columns = [column.name for column in BridgeInfo.__table__.columns]
+            return pd.DataFrame([{column: getattr(row, column) for column in columns} for row in rows])
 
         posts = self.discourse.get_posts(topic["id"])
         topic_info = get_topic_data(topic, is_new_topic)
-        mapping = {} if is_new_topic else topic_info.set_index("id")["message_id"].to_dict()
+        mapping = {} if len(topic_info) == 0 else topic_info.set_index("id")["message_id"].to_dict()
 
         records = []
         uploaded = [] if len(topic_info) == 0 else topic_info["id"].to_list()
@@ -231,9 +234,11 @@ class DiscourseBridge(BaseModule):
             mapping[post["id"]] = message_id
 
         if records:
-            records = pd.DataFrame(records)
-            self.ctx.db.insert(records, self.table_name, self.db_schema)
-            self.logger.info(f"Uploaded {len(records)} records to {self.db_schema}.{self.table_name} for {topic['url']}")
+            with self.ctx.db.session(self.db_schema) as session:
+                session.add_all([BridgeInfo(**record) for record in records])
+                session.commit()
+
+            self.logger.info(f"Uploaded {len(records)} records to {self.db_schema}.{BridgeInfo.__table__} for {topic['url']}")
 
         return len(records) > 0
 
@@ -241,41 +246,49 @@ class DiscourseBridge(BaseModule):
     def to_discourse(self, channel: Channel, is_open: bool, community_name: str) -> bool:
 
         def get_uploaded(channel: Channel) -> pd.DataFrame:
-            query = f"""
-            SELECT *
-            FROM {self.db_schema}.{self.table_name}
-            WHERE chat_id = '{channel.id}'
+            rows = self.ctx.db.query(BridgeInfo, self.db_schema)\
+                                .filter(BridgeInfo.chat_id == channel.id)\
+                                .all()
+            columns = [column.name for column in BridgeInfo.__table__.columns]
+            return pd.DataFrame([{column: getattr(row, column) for column in columns} for row in rows])
+
+        def get_new_messages(info: pd.DataFrame, messages: pd.DataFrame) -> pd.DataFrame:
             """
-            return pd.DataFrame(self.ctx.db.fetch_all(query))
+            Get messages that have not been uploaded to Discourse
+            """
+            query = ~messages["id"].isin(info["message_id"])
+            columns = [
+                "id", "text", "image",
+                "album_id", "compressed_key", "content_type",
+                "response_to", "whisper_timestamp"
+            ]
+            for column in columns:
+                if column in messages.columns:
+                    continue
+                messages[column] = None
+
+            new_messages = messages.loc[query, columns].reset_index(drop=True)
+            if len(new_messages) > 0:
+                # Oldest to newest. `.sort_values` is not used in case there are
+                # messages sent at once. For example a text message with multiple
+                # images, they will have the exact same `whisper_timestamp`
+                new_messages= new_messages.iloc[::-1].reset_index(drop=True)
+
+            return new_messages.copy()
 
         info = get_uploaded(channel)
 
         now = datetime.datetime.now()
         start_timestamp = now.replace(hour=0, minute=0, second=0, microsecond=0)
         end_timestamp = now.replace(hour=23, minute=59, second=59, microsecond=0)
-
-        messages = channel.get_messages()
-        if not messages:
+        messages = pd.DataFrame(channel.get_messages())
+        if len(messages) == 0:
             return False
 
-        messages = pd.DataFrame(messages)
-
-        query = ~messages["id"].isin(info["message_id"])
-        columns = ["id", "text", "image", "album_id", "compressed_key", "content_type", "response_to", "whisper_timestamp"]
-
-        for column in columns:
-            if column in messages.columns:
-                continue
-            messages[column] = None
-
-        new_messages = messages.loc[query, columns].reset_index(drop=True)
-        if query.sum() == 0:
+        new_messages = get_new_messages(info, messages)
+        if len(new_messages) == 0:
             return False
 
-        # Oldest to newest. `.sort_values` is not used in case there are
-        # messages sent at once. For example a text message with multiple
-        # images, they will have the exact same `whisper_timestamp`
-        new_messages= new_messages.iloc[::-1].reset_index(drop=True)
         image_albums = []
         post_number_mapping = info.set_index("message_id")["post_number"].to_dict()
         table_id_mapping = info.set_index("post_number")["id"].to_dict()
@@ -326,29 +339,30 @@ class DiscourseBridge(BaseModule):
                 if not output:
                     self.logger.warning(f"API key for {self.discourse.base_url} not found... Message '{new_message['id']}' was not uploaded to Discourse.")
                     continue
-                point = {
-                    "id": f"{metadata['topic_id']}-{output['id']}",
-                    "topic_id": metadata["topic_id"],
-                    "post_id": output["id"],
-                    "post_number": output["post_number"],
-                    "reply_to": table_id_mapping[reply_to],
-                    "user_id": output['user_id'],
-                    "username": output['username'],
-                    "markdown_text": text,
-                    "image_url": output["avatar_template"],
-                    "post_url": output["post_url"],
-                    "created_at": timestamp,
-                    "updated_at": pd.Timestamp(output["created_at"]),
-                    "slug": metadata["slug"],
-                    "message_id": new_message["id"],
-                    "chat_id": metadata["chat_id"],
-                    "source": "status",
-                    "is_open": True
-                }
+
+                point = BridgeInfo(
+                    id=f"{metadata['topic_id']}-{output['id']}",
+                    topic_id=metadata["topic_id"],
+                    post_id=output["id"],
+                    post_number=output["post_number"],
+                    reply_to=table_id_mapping[reply_to],
+                    user_id=output["user_id"],
+                    username=output["username"],
+                    markdown_text=text,
+                    image_url=output["avatar_template"],
+                    post_url=output["post_url"],
+                    created_at=timestamp,
+                    updated_at=pd.Timestamp(output["created_at"]),
+                    slug=metadata["slug"],
+                    message_id=new_message["id"],
+                    chat_id=metadata["chat_id"],
+                    source="status",
+                    is_open=True
+                )
                 records.append(point)
-                post_number_mapping.update({point["message_id"]: point["post_number"]})
-                table_id_mapping.update({point["post_number"]: point["id"]})
-                channel.send_emoji_reaction(point["message_id"], self.success_emoji)
+                post_number_mapping.update({point.message_id: point.post_number})
+                table_id_mapping.update({point.post_number: point.id})
+                channel.send_emoji_reaction(point.message_id, self.success_emoji)
                 self.logger.info(f"Waiting {self.discourse_seconds_wait}s")
                 time.sleep(self.discourse_seconds_wait)
             except Exception as e:
@@ -357,7 +371,12 @@ class DiscourseBridge(BaseModule):
         if not records:
             return False
 
-        records = pd.DataFrame(records)
-        self.ctx.db.insert(records, self.table_name, self.db_schema)
-        self.logger.info(f"Uploaded {len(records)} records to {self.db_schema}.{self.table_name} for # {channel.name}")
+        with self.ctx.db.session(self.db_schema) as session:
+            session.add_all([
+                BridgeInfo(**record) if isinstance(record, dict) else record
+                for record in records
+            ])
+            session.commit()
+
+        self.logger.info(f"Uploaded {len(records)} records from # {channel.name}")
         return True
