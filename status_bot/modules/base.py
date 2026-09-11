@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
-from status_sdk import Account
+from status_sdk import Account, models as sdk_models
 from status_bot import Database
 import threading, logging
 
@@ -14,6 +14,11 @@ class ModuleType(Enum):
     EVENT = "event"
     SERVICE = "service"
 
+class EventType(Enum):
+    CONTACT_REQUESTS = "contact_requests"
+    MESSAGE_MENTIONS = "message_mentions"
+    MESSAGES = "messages"
+    RAW_SIGNALS = "raw_signals"
 
 def _module_type_to_set(module_type: ModuleType) -> set[ModuleType]:
     return {module_type}
@@ -53,6 +58,9 @@ class BaseModule(ABC):
         self.__db_schema = self.__settings.get("schema", self.ctx.config.name)
         self.__account = self.ctx.account
 
+        if ModuleType.EVENT not in self.module_type and self.event_type:
+            raise ValueError(f"{self.__class__.__name__} sets event_type {self.event_type} but module_type is {self.module_type}, not {ModuleType.EVENT}...")
+
     @property
     def interval(self) -> int:
         return self.__interval
@@ -83,6 +91,10 @@ class BaseModule(ABC):
         ...
 
     @property
+    def event_type(self) -> Optional[EventType]:
+        return None
+
+    @property
     def name(self) -> str:
         return self._ctx.config.name
 
@@ -96,7 +108,7 @@ class BaseModule(ABC):
     def on_stop(self) -> None:
         pass
 
-    def on_event(self, event_type: str, event: dict) -> Any:
+    def on_event(self, event: sdk_models.ContactRequest | sdk_models.Message | dict) -> Any:
         return None
 
     def register_metrics(self) -> None:

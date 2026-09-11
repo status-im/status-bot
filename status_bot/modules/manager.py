@@ -3,10 +3,8 @@ import threading
 import logging
 from typing import Type
 from pathlib import Path
-
-from .base import BaseModule, ModuleConfig, ModuleContext, ModuleType
+from .base import BaseModule, ModuleConfig, ModuleContext, ModuleType, EventType
 from status_bot.config import ModulesConfig
-from status_bot.constants import EventTypeEnum
 from status_bot import Database
 from status_sdk import Account
 
@@ -147,7 +145,7 @@ class ModuleManager:
 
         # Start centralized event listener thread
         self._event_listener_thread = threading.Thread(
-            target=self._run_event_listener,
+            target=self._run_event,
             daemon=True,
             name="event-listener",
         )
@@ -214,16 +212,24 @@ class ModuleManager:
             logger.info(f"Sleeping for {interval} min")
             self._stop_event.wait(interval)
 
+    def _run_event(self, module: BaseModule) -> None:
 
-    def _run_event_listener(self) -> None:
-        for event in self._account.signal.listen([EventTypeEnum.MESSAGE.value]):
-            event_type = event.get('type')
-            logger.info(f"Received a {event_type}")
+        event_mapping = {
+            EventType.CONTACT_REQUESTS: self._account.listen_contact_requests,
+            EventType.MESSAGE_MENTIONS: self._account.listen_message_mentions,
+            EventType.MESSAGES: self._account.listen_messages,
+            EventType.RAW_SIGNALS: self._account.signal.listen
+        }
+
+        event_function = event_mapping.get(module.event_type)
+        if not event_function:
+            raise ValueError(f"Event Type {module.event_type} does not exist in class EventType...")
+
+        for event in event_function():
             if self._stop_event.is_set():
                 break
             try:
-                for module in self._event_modules.values():
-                    module.on_event(event_type, event)
+                module.on_event(event)
             except Exception as e:
                 logger.error(
                     f"Error in event listener: {e}",

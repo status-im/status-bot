@@ -10,7 +10,7 @@ from status_bot.constants import (
     _MESSAGE_DROP_COLUMNS,
 )
 from status_bot.models import ReceivedChat, ReceivedMessage
-from status_bot.modules.base import BaseModule, ModuleType
+from status_bot.modules.base import BaseModule, ModuleType, EventType
 from status_bot.modules.utils import camel_to_snake, to_hmac_sha256_hash
 
 logger = logging.getLogger(__name__)
@@ -69,6 +69,10 @@ class ReceiverModule(BaseModule):
     @property
     def module_type(self) -> set[ModuleType]:
         return {ModuleType.EVENT}
+
+    @property
+    def event_type(self) -> ModuleType:
+        return EventType.RAW_SIGNALS
 
     def on_start(self):
         config = self.ctx.shared_state.get("config")
