@@ -7,6 +7,7 @@ import pandas as pd
 import datetime
 import sqlalchemy
 import logging
+from prometheus_client import Counter
 
 logger = logging.getLogger(__name__)
 try:
@@ -54,7 +55,7 @@ class CommunitiesMonitoring(BaseModule):
             # Token Gated communties
             self.account["USD"]
         except Exception:
-            self.logger.error(
+            logger.error(
                 "Error with wallet functionalities! Token gated communities will not be available"
             )
 
@@ -63,10 +64,10 @@ class CommunitiesMonitoring(BaseModule):
             device = "cuda" if torch.cuda.is_available() else "cpu"
             self._model = Detoxify("original", device=device)
             self.__columns.update({key: False for key in self._model.predict("test").keys()})
-            self.logger.info(f"Initialized Detoxify on {device}")
+            logger.info(f"Initialized Detoxify on {device}")
         except Exception:
             self._model = None
-            self.logger.warning("Skipping toxic comment classification, detoxify initialized")
+            logger.warning("Skipping toxic comment classification, detoxify initialized")
 
         if not self.settings.get("detoxify", False):
             self._model = None
@@ -85,7 +86,7 @@ class CommunitiesMonitoring(BaseModule):
     def execute(self):
         community_names = self.settings.get("communities", [])
         if not community_names:
-            self.logger.warning("No communities passed in config.yaml...")
+            logger.warning("No communities passed in config.yaml...")
             return
 
         now = datetime.datetime.now()
@@ -100,7 +101,9 @@ class CommunitiesMonitoring(BaseModule):
                 RawCommunityInfo(**info, batch_timestamp=datetime.datetime.now())
             )
             messages = self.get_messages(community, now, latest_dates)
-            self.logger.info(f"Community '{community.name}' has {len(messages)} message(s)")
+            logger.info(f"Community '{community.name}' has {len(messages)} message(s)")
+            self._msg_per_community_counter.labels(community=community.name).inc(len(messages))
+
             if len(messages) == 0:
                 continue
 
@@ -138,7 +141,7 @@ class CommunitiesMonitoring(BaseModule):
             with self.ctx.db.session(self.db_schema) as session:
                 return {chat_id: pd.Timestamp(latest) for chat_id, latest in session.execute(query)}
         except Exception as e:
-            self.logger.exception(f"Could not read history from {self.db_schema}... {e}")
+            logger.exception(f"Could not read history from {self.db_schema}... {e}")
             return {}
 
     def get_messages(
@@ -204,3 +207,8 @@ class CommunitiesMonitoring(BaseModule):
         )
 
         return final.copy()
+
+    def register_metrics(self) -> None:
+        self._msg_per_community_counter = Counter(
+            "status_bot_community_monitoring_nb_message", "Message per community", ["community"]
+        )
