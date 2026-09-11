@@ -5,7 +5,7 @@ from typing import Any, Optional
 from sqlalchemy import create_engine, text, Row, inspect
 from sqlalchemy.exc import IntegrityError, NoSuchTableError
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, Query
 from sqlalchemy.dialects.postgresql import JSONB
 from .models import Base
 
@@ -44,6 +44,9 @@ class Database:
 
     def session(self, schema_name: Optional[str] = None) -> Session:
         return self._session_factory(bind=self.__bind(schema_name))
+
+    def query(self, model, schema_name: Optional[str] = None) -> Query:
+        return self.session(schema_name).query(model)
 
     def __bind(self, schema_name: Optional[str]) -> Engine:
         # sqlite has no schemas, so unqualified names are the only option there
