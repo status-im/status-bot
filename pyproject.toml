@@ -12,7 +12,7 @@ dependencies = [
     "pydantic-settings",
     "python-dotenv",
     "psycopg2-binary",
-    "sqlalchemy",
+    "sqlalchemy==2.0.54",
     "prometheus-client",
     "status-sdk==1.1.4",
     "pyyaml",
