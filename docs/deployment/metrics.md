@@ -60,6 +60,14 @@ status_bot_module_loaded{module="api_server"} 1
 |------|--------|-------------|
 | Counter | `module` | Total number of (re)start attempts after a module failure |
 
+
+### `status_bot_module_start_failure`
+
+| Type | Labels | Description |
+|------|--------|-------------|
+| Counter | `module` | Total number of failure to start a module |
+
+
 ---
 
 ## API metrics

@@ -40,8 +40,11 @@ class ModuleManager:
         self._periodic_execution = Counter(
             "status_bot_module_execution", "Number of execution per module", ["module"]
         )
-        self._start_try = Counter(
-            "status_bot_module_start", "Number of Start for per module", ["module"]
+        self._module_start = Counter(
+            "status_bot_module_start", "Number of Start per module", ["module"]
+        )
+        self._module_failure = Counter(
+            "status_bot_module_start_failure", "Number of failure to start per module", ["module"]
         )
 
     @property
@@ -186,6 +189,7 @@ class ModuleManager:
         while retries <= max_retries and not self._stop_event.is_set():
             try:
                 module._running = True
+                self._module_start.labels(module=module.name)
                 module.on_start()
 
                 if ModuleType.SERVICE in module.module_type:
@@ -206,7 +210,7 @@ class ModuleManager:
                     f"Module '{module.name}' failed ({retries}/{max_retries}): {e}",
                     exc_info=True,
                 )
-                self._start_try.labels(module=module.name).inc()
+                self._module_failure.labels(module=module.name).inc()
                 if retries <= max_retries:
                     wait = backoff * (2 ** (retries - 1))
                     logger.info(f"Restarting '{module.name}' in {wait}s...")
