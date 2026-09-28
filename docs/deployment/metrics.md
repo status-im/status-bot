@@ -42,23 +42,72 @@ status_bot_module_loaded{module="messaging"} 1
 status_bot_module_loaded{module="api_server"} 1
 ```
 
-### `status_bot_module_errors_total`
+### `status_bot_module_execution_error`
 
 | Type | Labels | Description |
 |------|--------|-------------|
-| Counter | `module` | Total number of errors encountered by a module |
+| Counter | `module` | Total number of errors encountered while running a module |
 
-### `status_bot_module_restarts_total`
+### `status_bot_module_execution`
 
 | Type | Labels | Description |
 |------|--------|-------------|
-| Counter | `module` | Total number of times a module has been restarted |
+| Counter | `module` | Total number of periodic executions per module |
+
+### `status_bot_module_start`
+
+| Type | Labels | Description |
+|------|--------|-------------|
+| Counter | `module` | Total number of (re)start attempts after a module failure |
+
+---
+
+## API metrics
+
+Registered by the `api_server` module. Like all module metrics they only exist
+when `metrics.enabled` is `true`, and they cover **every** route served by the
+shared FastAPI app — including routes added by other modules such as
+`messaging`.
+
+### `status_bot_api_requests_total`
+
+| Type | Labels | Description |
+|------|--------|-------------|
+| Counter | `module`, `method`, `path`, `status` | Total HTTP requests handled by the API |
+
+### `status_bot_api_request_duration_seconds`
+
+| Type | Labels | Description |
+|------|--------|-------------|
+| Histogram | `module`, `method`, `path` | Request latency in seconds |
+
+### `status_bot_api_auth_failures_total`
+
+| Type | Labels | Description |
+|------|--------|-------------|
+| Counter | `module` | Requests rejected by the API key middleware (HTTP 401) |
+
+`path` is the route *template* (e.g. `/api/v1/chats/{chat_id}/messages`), so
+label cardinality stays bounded. Requests that match no route (404s) and
+requests rejected before routing (401s) are labeled `path="unmatched"`.
+
+Example:
+```
+status_bot_api_requests_total{module="api_server",method="GET",path="/health",status="200"} 1
+status_bot_api_requests_total{module="api_server",method="GET",path="/api/v1/chats/{chat_id}/messages",status="200"} 3
+status_bot_api_auth_failures_total{module="api_server"} 2
+```
 
 ---
 
 ## Adding metrics to modules
 
 The start_prometheus() function in status_bot/metrics.py automatically calls module.register_metrics() for each loaded module after setting up the built-in metrics.
+
+`register_metrics()` is only called when `metrics.enabled` is `true`. Declare
+your metric attributes as `None` on the module and guard every increment so the
+module keeps working when the exporter is disabled — see how `api_server` does
+it in `status_bot/modules/api_server.py`.
 
 ```python
 from prometheus_client import Counter, Gauge
@@ -67,8 +116,8 @@ from status_bot.modules.base import BaseModule, ModuleType
 class MyModule(BaseModule):
 
     @property
-    def module_type(self) -> ModuleType:
-        return ModuleType.PERIODIC
+    def module_type(self) -> set[ModuleType]:
+        return {ModuleType.PERIODIC}
 
     def register_metrics(self) -> None:
         # Register a counter with module name as label

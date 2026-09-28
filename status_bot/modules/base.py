@@ -116,8 +116,12 @@ class BaseModule(ABC):
     def register_metrics(self) -> None:
         """Override in subclasses to register custom Prometheus metrics.
 
-        Metrics registered here will be exposed alongside the built-in bot metrics.
-        The module name will be automatically added as a label to all registered metrics.
+        Metrics registered here are exposed alongside the built-in bot metrics.
+        This hook is only called when the Prometheus exporter is enabled
+        (``metrics.enabled``); keep any metric attributes optional (``None`` by
+        default) so recording code is a no-op otherwise. Labels are not added
+        automatically — declare a ``module`` label with ``self.name`` when the
+        metric should be attributable to a module.
         """
         pass
 
