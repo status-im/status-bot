@@ -52,6 +52,9 @@ MODULE_EVENT_EXECUTION_TIME = Histogram(
 
 
 class BaseModule(ABC):
+
+    _mandatory_properties = []
+
     def __init__(self, ctx: ModuleContext):
         self._ctx = ctx
         self.__logger = logging.getLogger(self.__class__.__name__)
@@ -104,8 +107,13 @@ class BaseModule(ABC):
     @abstractmethod
     def execute(self) -> Any: ...
 
-    def on_start(self) -> None:
+    def start(self) -> None:
         self.logger.info(f"Starting module {self.__class__.__name__}")
+        self._verify_mandatory_config()
+        self.on_start()
+
+    @abstractmethod
+    def on_start(self) -> None: ...
 
     def on_stop(self) -> None:
         pass
@@ -125,9 +133,9 @@ class BaseModule(ABC):
         """
         pass
 
-    def _verify_mandatory_config(self, config_fields: list[str]):
+    def _verify_mandatory_config(self):
         missing_fields = []
-        for config_field in config_fields:
+        for config_field in self._mandatory_properties:
             if self.ctx.config.settings.get(config_field) is None:
                 missing_fields.append(config_field)
         if len(missing_fields) > 0:

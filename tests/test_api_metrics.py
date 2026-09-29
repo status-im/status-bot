@@ -54,10 +54,10 @@ def _build_api(api_key=None, register_metrics=True, with_error_route=False):
         )
     )
 
-    # Order matters: register_metrics() before on_start(), auth middleware
+    # Order matters: register_metrics() before start(), auth middleware
     # before metrics middleware (so 401 responses are recorded).
-    api_module.on_start()
-    messaging_module.on_start()
+    api_module.start()
+    messaging_module.start()
 
     if with_error_route:
 

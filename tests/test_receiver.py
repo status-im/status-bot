@@ -163,7 +163,7 @@ def _receiver_module(db) -> receiver.ReceiverModule:
         shared_state={},
     )
     module = receiver.ReceiverModule(ctx)
-    module.on_start()
+    module.start()
     return module
 
 

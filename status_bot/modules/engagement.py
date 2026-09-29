@@ -15,20 +15,6 @@ from status_sdk import GroupChat
 
 logger = logging.getLogger(__name__)
 
-MANDATORY_CONFIG_FIELD = [
-    # Events Config
-    "first_messages",
-    "feedback_keywords",
-    "helper_message",
-    "automatic_reply",
-    "group_chat",
-    "new_user_message_contact_request",
-    "existing_users_messages",
-    "image_folder",
-    # Periodic Config
-    "periodic_messages",
-]
-
 REPLY_MSG_ERROR_IMG = "\nAn image was sent, but an error occured during the download"
 
 IGNORED_MSG_CONTENT_TYPE = [
@@ -74,6 +60,21 @@ def get_response_reply_if_exist(db_session: Session, messages: list[dict]) -> Op
 
 
 class Engagement(BaseModule):
+
+    _mandatory_properties = [
+        # Events Config
+        "first_messages",
+        "feedback_keywords",
+        "helper_message",
+        "automatic_reply",
+        "group_chat",
+        "new_user_message_contact_request",
+        "existing_users_messages",
+        "image_folder",
+        # Periodic Config
+        "periodic_messages",
+    ]
+
     DESCRIPTION = """
         Module made for Engagmement in the Status App.
         It accept all the friend request and send welcome message
@@ -85,7 +86,6 @@ class Engagement(BaseModule):
 
     def on_start(self):
         logger.info("Starting module Engagement Bot")
-        self._verify_mandatory_config(MANDATORY_CONFIG_FIELD)
         if self.ctx.db is None:
             raise ConnectionError("Database connection not setup")
         group_chat_config = self.settings.get("group_chat", {})

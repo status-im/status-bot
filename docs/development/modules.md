@@ -80,6 +80,10 @@ self.ctx.config.max_retries # restart attempts before permanent failure
 self.ctx.config.settings    # dict of module-specific settings
 ```
 
+#### `_mandatory_properities`
+
+List of keys that must be present in the module configuration.
+The properties presence is check at the start of the module.
 
 ## Adding API routes
 

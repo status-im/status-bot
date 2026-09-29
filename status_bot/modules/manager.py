@@ -190,7 +190,7 @@ class ModuleManager:
             try:
                 module._running = True
                 self._module_start.labels(module=module.name)
-                module.on_start()
+                module.start()
 
                 if ModuleType.SERVICE in module.module_type:
                     module.execute()
