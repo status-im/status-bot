@@ -239,9 +239,7 @@ class ModuleManager:
             self._stop_event.wait(interval)
 
     def _run_event_listener(self) -> None:
-        for event in self._account.signal.listen([EventTypeEnum.MESSAGE.value]):
-            event_type = event.get("type")
-            logger.info(f"Received a {event_type}")
+        for messages in self._account.listen_messages():
             if self._stop_event.is_set():
                 break
             try:
