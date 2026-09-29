@@ -246,7 +246,7 @@ class ModuleManager:
                 break
             try:
                 for module in self._event_modules.values():
-                    module.on_event(event_type, event)
+                    module.run_event(event_type, event)
             except Exception as e:
                 logger.error(
                     f"Error in event listener: {e}",
