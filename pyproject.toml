@@ -14,7 +14,7 @@ dependencies = [
     "psycopg2-binary",
     "sqlalchemy==2.0.54",
     "prometheus-client",
-    "status-sdk==1.1.4",
+    "status-sdk==1.2.0",
     "pyyaml",
     "pandas",
 ]
