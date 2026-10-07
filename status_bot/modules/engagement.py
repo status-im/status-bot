@@ -60,7 +60,6 @@ def get_response_reply_if_exist(db_session: Session, messages: list[dict]) -> Op
 
 
 class Engagement(BaseModule):
-
     _mandatory_properties = [
         # Events Config
         "first_messages",

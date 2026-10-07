@@ -65,7 +65,7 @@ Data from `Messages` and `Chats` are hashed with sha256 and a pepper, to avoid s
 
 ## Community Monitoring
 
-The module `communities_monitoring` will allow to periodically fetch information of the community the bot account has access.
+The module `community_monitoring` will allow to periodically fetch information of the community the bot account has access.
 
 The data by the Bot are the following.
 

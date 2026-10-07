@@ -52,7 +52,6 @@ MODULE_EVENT_EXECUTION_TIME = Histogram(
 
 
 class BaseModule(ABC):
-
     _mandatory_properties = []
 
     def __init__(self, ctx: ModuleContext):

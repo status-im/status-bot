@@ -21,7 +21,7 @@ Modules can declare one or more types. The behavior is composed from the declare
 ```python
 from status_bot.modules.base import BaseModule, ModuleType
 
-class MyModule:
+class MyModule(BaseModule):
 
     @property
     def module_type(self) -> set[ModuleType]:
@@ -36,8 +36,11 @@ class MyModule:
     def on_stop(self):
         ...  # called once when the module stops
 
-    def on_event(self, event: dict):
+    def on_event(self, event_type: str, event: dict):
         ...  # handle a signal event (EVENT type only)
+
+    def register_metrics(self):
+        ...  # optional: register Prometheus metrics
 ```
 ### Properties
 
@@ -56,6 +59,18 @@ Logged in Status account that can be used within the module.
 #### `logger`
 
 Set up logger that can be used within modules.
+
+#### `name`
+
+Module name (from configuration).
+
+#### `settings`
+
+Module-specific settings dictionary from `config.yaml`.
+
+#### `is_running`
+
+Boolean indicating whether the module is currently running.
 
 #### `ctx`
 
@@ -80,10 +95,10 @@ self.ctx.config.max_retries # restart attempts before permanent failure
 self.ctx.config.settings    # dict of module-specific settings
 ```
 
-#### `_mandatory_properities`
+#### `_mandatory_properties`
 
 List of keys that must be present in the module configuration.
-The properties presence is check at the start of the module.
+The presence of properties is checked at the start of the module.
 
 ## Adding API routes
 
@@ -128,7 +143,7 @@ class AutoReplyModule(BaseModule):
     def on_start(self):
         self._commands = self.ctx.config.settings.get("commands", {})
 
-    def on_event(self, event: dict):
+    def on_event(self, event_type: str, event: dict):
         messages = event.get("event", {}).get("messages", [])
         for msg in messages:
             self.ctx.account.send_message(msg["chatId"], "Message received")

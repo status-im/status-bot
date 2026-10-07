@@ -29,6 +29,7 @@ class CommunitiesMonitoring(BaseModule):
     Upcoming features:
         - Channel threads
     """
+
     _mandatory_properties = ["communities"]
 
     BRIDGE_KEY = "bridge_message"
