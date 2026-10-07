@@ -92,7 +92,7 @@ def download_image(url: str, image_path: str):
         raise ImageDownloadFailedException(f"Failed to download image from {url}")
 
 
-def is_group_chat_message(event_data: dict, chat_id: Optional[str] = None) -> bool:
+def is_group_chat_message(message, chat_id: Optional[str] = None) -> bool:
     """
     Determind if the message is from a group chat
     Parameters:
@@ -101,13 +101,10 @@ def is_group_chat_message(event_data: dict, chat_id: Optional[str] = None) -> bo
     Output:
         - boolean indiciating if the message is from a ChatGroup and if it has the same chat_id
     """
-    chats = event_data.get("chats", [])
-    if len(chats) == 0:
-        return False
-    if chats[0].get("chatType") != 3:
+    if message.chat_type != "group":
         return False
     if not chat_id:
         return True
-    if chats[0].get("id") == chat_id:
+    if message.chat_id == chat_id:
         return True
     return False

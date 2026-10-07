@@ -239,12 +239,12 @@ class ModuleManager:
             self._stop_event.wait(interval)
 
     def _run_event_listener(self) -> None:
-        for messages in self._account.listen_messages():
+        for message in self._account.listen_messages():
             if self._stop_event.is_set():
                 break
             try:
                 for module in self._event_modules.values():
-                    module.run_event(event_type, event)
+                    module.run_event(message)
             except Exception as e:
                 logger.error(
                     f"Error in event listener: {e}",
