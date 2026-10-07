@@ -1,6 +1,6 @@
 [project]
 name = "status-bot"
-version = "1.0.0"
+version = "1.1.0-dev"
 description = "A modular bot for Status App that automates tasks, responds to commands, and integrates with APIs."
 requires-python = ">=3.12"
 license-files = ["LICENSE.md"]
