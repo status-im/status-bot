@@ -67,6 +67,47 @@ status_bot_module_loaded{module="api_server"} 1
 |------|--------|-------------|
 | Counter | `module` | Total number of failure to start a module |
 
+### `status_bot_periodic_execution_duration_seconds`
+
+| Type | Labels | Description |
+|------|--------|-------------|
+| Histogram | `module` | Time spent executing periodic module jobs in seconds |
+
+### `status_bot_event_execution_duration_seconds`
+
+| Type | Labels | Description |
+|------|--------|-------------|
+| Histogram | `module` | Time spent executing event handlers in seconds |
+
+
+---
+
+## Module-specific metrics
+
+### `status_bot_community_monitoring_nb_message`
+
+| Type | Labels | Description |
+|------|--------|-------------|
+| Counter | `community` | Total number of messages fetched per community |
+
+Registered by the `community_monitoring` module.
+
+### `status_bot_engagement_actions`
+
+| Type | Labels | Description |
+|------|--------|-------------|
+| Counter | `type` | Total engagement actions (see [Engagement](../usage/engagement.md#metrics) for label values) |
+
+Registered by the `engagement` module.
+
+### `status_bot_engagement_periodic`
+
+| Type | Labels | Description |
+|------|--------|-------------|
+| Counter | `delay` | Total periodic engagement messages sent, labeled by delay (in days) |
+
+Registered by the `engagement` module.
+
 
 ---
 

@@ -61,12 +61,13 @@ files:
 | Field | Type | Default | Env var | Description |
 |-------|------|---------|---------|-------------|
 | `name` | `str` | `""` | `BOT__NAME` | Status display name used to log in |
-| `public_key` | `str` | `""` | `BOT__PUBLIC_KEY` | Expected public key for verification |
+| `chat_key` | `str` | `""` | `BOT__CHAT_KEY` | Chat key for the account |
+| `bio` | `str` | `"Just a bot"` | `BOT__BIO` | Profile bio text |
+| `profil_picture_path` | `str` | `"assets/profile.jpg"` | `BOT__PROFIL_PICTURE_PATH` | Path to profile picture |
 | `password` | `str` | `""` | `BOT__PASSWORD` | Status account password |
-| `mnemonic_phrase` | `str` | `""` | `BOT__MNEMONIC_PHRASE` | 12-word recovery phrase (used when `init_account: true`) |
-| `init_account` | `bool` | `false` | `BOT__INIT_ACCOUNT` | If `false`, the account must already exist. If `true`, creates or restores the account using `mnemonic_phrase` |
-| `compressed_key` | `str` | `""` | `BOT__COMPRESSED_KEY` | Expected compressed key for verification after login |
-| `infura_token` | `str` | `""` | `BOT__INFURA_TOKEN` | [Infura token](https://www.infura.io/) required for token-gated communities |
+| `mnemonic_phrase` | `str` | `null` | `BOT__MNEMONIC_PHRASE` | 12-word recovery phrase (used to create/restore account) |
+| `infura_token` | `str` | `null` | `BOT__INFURA_TOKEN` | [Infura token](https://www.infura.io/) required for token-gated communities |
+| `alchemy_token` | `str` | `null` | `BOT__ALCHEMY_TOKEN` | [Alchemy token](https://www.alchemy.com/) for EVM access |
 | `coingecko_api_key` | `str` | `""` | `BOT__COINGECKO_API_KEY` | [CoinGecko API key](https://www.coingecko.com/) required for token-gated communities |
 | `bot_hash_pepper` | `str` | `""` | `BOT__BOT_HASH_PEPPER` | Secret key used for HMAC-SHA256 hashing of stored messages (see [Privacy & storage](#privacy--storage)) |
 
@@ -74,11 +75,15 @@ files:
 ```yaml
 bot:
     name: 'my-bot'
-    public_key: '0x...'
+    chat_key: 'zQ3...'
+    bio: 'Just a bot'
+    profil_picture_path: 'assets/profile.jpg'
     password: 'ChangeMe'
     mnemonic_phrase: 'word1 word2 ... word12'
-    init_account: false
-    compressed_key: 'zQ3...'
+    infura_token: 'your-infura-token'
+    alchemy_token: 'your-alchemy-token'
+    coingecko_api_key: 'your-coingecko-key'
+    bot_hash_pepper: 'your-secret-pepper'
 ```
 
 ### `backend`
@@ -144,7 +149,7 @@ database:
     user: 'myuser'
     password: 'ChangeMe'
     name: 'status-bot'
-    schema: "status_app_monitoring"
+    schema_name: "status_app_monitoring"
     tables:
         messages: "raw_messages"
         community: "raw_community_info"

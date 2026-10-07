@@ -41,13 +41,14 @@ The account can be initialized at startup with the following configuration:
 
 ```yaml
 bot:
-    password: 'Gonster2026!'
-    mnemonic_phrase: "ETH seed phrase"
-    chat_key: 'zQ3..Example'
     name: 'Display Name'
+    chat_key: 'zQ3...Example'
+    password: 'YourPassword'
+    mnemonic_phrase: 'word1 word2 ... word12'
     infura_token: 'Your Infura token'
-    coingecko_api_key: 'Your Coingecko API key'
     alchemy_token: 'Your Alchemy token'
+    coingecko_api_key: 'Your Coingecko API key'
+    bot_hash_pepper: 'your-secret-pepper'
 ```
 
 ### Importing Status Account
