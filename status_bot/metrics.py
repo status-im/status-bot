@@ -2,6 +2,7 @@ import logging
 
 from status_bot.config import MetricsConfig
 from status_bot.modules.manager import ModuleManager
+from status_bot.constants import __version__
 from prometheus_client import start_http_server, Gauge
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ def start_prometheus(metrics_config: MetricsConfig, manager: ModuleManager, acco
     module_loaded = Gauge("status_bot_module_loaded", "Module loaded", ["module"])
 
     health.set(1)
-    version.labels(version="1.0.0", name=account_name).set(1)
+    version.labels(version=__version__, name=account_name).set(1)
 
     for module_name in manager.module_names:
         module_loaded.labels(module=module_name).set(1)
