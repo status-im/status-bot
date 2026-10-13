@@ -12,7 +12,6 @@ logging:
 bot:
     name: 'status-bot'
     chat_key: "zQ3..Example"
-    bot_hash_pepper: '' # Use a large random value
     encryption_key: '' # Secret used to encrypt stored messages (AES-256-SIV). Use a large random value
 
 backend:

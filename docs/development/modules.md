@@ -154,7 +154,6 @@ A module can declare `EVENT` alongside other types (e.g., `PERIODIC | EVENT`). I
 | Function | Description |
 |----------|-------------|
 | `to_sha256_hash(value)` | Returns the SHA-256 hex digest of a string |
-| `to_hmac_sha256_hash(value, pepper)` | Returns the HMAC-SHA256 hex digest of a string, keyed with the `bot.bot_hash_pepper` config value. Falls back to plain `to_sha256_hash` (with a one-time warning) when the pepper is empty |
 | `derive_encryption_key(secret)` | Derives the AES-SIV key from `bot.encryption_key`: a hex/base64 encoded 32/48/64 byte value is used directly, any other value is stretched with PBKDF2-HMAC-SHA256. Warns once when the secret is empty |
 | `to_encrypted_value(value, key)` | Encrypts a string with AES-SIV (deterministic, authenticated) and returns it with an `enc1$` prefix |
 | `from_encrypted_value(value, key)` | Decrypts a value produced by `to_encrypted_value`; raises `ValueError` on tampering or a wrong key |

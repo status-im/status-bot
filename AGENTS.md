@@ -31,9 +31,9 @@ for the module API (`BaseModule`, `ModuleType`, `ModuleContext`).
 - `status_bot/config.py` — all pydantic configuration models.
 - `status_bot/logger.py` — centralized logging setup, formatters, and secret redaction.
 - `status_bot/database.py` — `Database` wrapper (Postgres / SQLite) around SQLAlchemy; exposes `create_tables()`.
-- `status_bot/models/base.py` — Declarative `Base`, plus `namespace()` and `model_by_table()` helpers (re-exported from the top-level `status_bot` package).
+- `status_bot/models/base.py` — Declarative `Base`, the single SQLAlchemy registry every model registers on (re-exported from the top-level `status_bot` package).
 - `status_bot/metrics.py` — Prometheus metrics exporter startup.
-- `status_bot/models/` — SQLAlchemy ORM models (`ReceivedMessage`, `ReceivedChat`,
+- `status_bot/models/` — SQLAlchemy ORM models (`ReceivedMessage`,
   `RawCommunityInfo`, `RawMessage`, `ContactRequest`, `FeedbackMessage`).
 - `status_bot/modules/` — built-in modules and the module framework.
 - `tests/` — pytest test suite.

@@ -1,7 +1,6 @@
 import base64
 import binascii
 import datetime
-import hmac
 import logging
 import re
 from hashlib import sha256
@@ -19,7 +18,6 @@ from status_sdk.types import Chat
 
 logger = logging.getLogger(__name__)
 
-_PEPPER_WARNED = False
 _EMPTY_KEY_WARNED = False
 
 # AES-SIV accepts 32, 48 or 64 byte keys (two keys of 16/24/32 bytes)
@@ -42,19 +40,6 @@ def remove_public_key(text: str) -> str:
     """
     pattern = re.compile(r"(?<![\w.])@0x[0-9a-fA-F]{130}")
     return pattern.sub("@anon", text)
-
-
-def to_hmac_sha256_hash(value: str, pepper: str = "") -> str:
-    global _PEPPER_WARNED
-    if pepper:
-        return hmac.new(pepper.encode(), value.encode(), sha256).hexdigest()
-    if not _PEPPER_WARNED:
-        _PEPPER_WARNED = True
-        logger.warning(
-            "bot.bot_hash_pepper is not set, falling back to plain SHA-256 "
-            "hashing (content is not protected against dictionary attacks)"
-        )
-    return to_sha256_hash(value)
 
 
 def _decode_raw_key(secret: str) -> Optional[bytes]:

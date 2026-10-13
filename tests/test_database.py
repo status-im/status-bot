@@ -4,7 +4,6 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from status_bot.database import Database
-from status_bot.models.chat import ReceivedChat
 from status_bot.models.message import ReceivedMessage
 
 
@@ -67,29 +66,6 @@ def test_duplicate_primary_key_raises_integrity_error():
             raise AssertionError("expected IntegrityError")
         except IntegrityError:
             session.rollback()
-
-
-def test_chat_round_trip_via_orm():
-    db = _database()
-    with db.session() as session:
-        session.add(
-            ReceivedChat(
-                id="chat-1",
-                type="public",
-                name="General",
-                received_timestamp=datetime.datetime(2024, 1, 1, 12, 0, 0),
-            )
-        )
-        session.commit()
-
-    with db.session() as session:
-        chats = session.execute(select(ReceivedChat)).scalars().all()
-
-    assert len(chats) == 1
-    chat = chats[0]
-    assert chat.id == "chat-1"
-    assert chat.type == "public"
-    assert chat.name == "General"
 
 
 def test_create_tables_is_idempotent():

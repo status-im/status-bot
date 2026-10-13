@@ -25,7 +25,7 @@ Data from `Messages` are encrypted with AES-256-SIV (deterministic, authenticate
 | compressed_key | String | - | (`NULL`, not provided by the SDK anymore) |
 | received_timestamp | DateTime | - | timestamp of the message reception by the bot |
 
-> **Upgrading from the previous HMAC-SHA256 scheme:** legacy rows are one-way hashes and can never be decrypted. Purge them before restarting with the new version: `DELETE FROM received_messages;`. The `received_chats` table is no longer written by the `receiver` module (events only carry messages) and can be dropped as well.
+> **Upgrading from the previous HMAC-SHA256 scheme:** legacy rows are one-way hashes and can never be decrypted. Purge them before restarting with the new version: `DELETE FROM received_messages;`. The `received_chats` table is no longer part of the schema (the `ReceivedChat` model was removed) and can be dropped with `DROP TABLE IF EXISTS received_chats;`.
 
 ## Community Monitoring
 
