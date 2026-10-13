@@ -84,7 +84,6 @@ class CommunitiesMonitoring(BaseModule):
                 ],
             )
 
-
     def execute(self):
         community_names = self.settings.get("communities", [])
         if not community_names:

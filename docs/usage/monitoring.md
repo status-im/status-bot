@@ -46,7 +46,8 @@ The data by the Bot are the following.
 | joined_timestamp | DateTime | Timestamp when the account joined the community. `None` when the account has not joined. |
 | requested_timestamp | DateTime | Timestamp when the join request was submitted. `None` when no request was made. |
 | encrypted | String | Whether the community messaging is encrypted. |
-| number_members | Integer | Total number of community members. |
+| members | Integer | Total number of community members. |
+| batch_timestamp | DateTime | Timestamp of the batch the community data was fetched in. |
 
 ### Channels
 
@@ -63,11 +64,11 @@ The data by the Bot are the following.
 
 | Key | Type | Description |
 |----|----|-------------|
-| `id` | String | The channel's own id | | |
+| `id` | String | The channel's own id |
 | `chat_id` | String | The community id and channel id joined together. Value to use to map a message to a channel. |
-| `name` | String | The channel name | | |
+| `name` | String | The channel name |
 | `description` | String | The channel description. |
-| `can_post` | Boolean | Whether the account can send messages to the channel. [`chats`](./account.md#chats) only lists channels where this is `True`. |
+| `can_post` | Boolean | Whether the account can send messages to the channel. The SDK's `chats` property only lists channels where this is `True`. |
 | `can_view` | Boolean | Whether the account can read the channel. |
 | `can_post_reaction` | Boolean | Whether the account can post emoji reactions. |
 | `token_gated` | Boolean | Whether access to the channel is gated behind a token. |

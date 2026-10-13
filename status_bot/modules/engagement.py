@@ -329,7 +329,8 @@ class Engagement(BaseModule):
 
     def delete_old_messages(self, db_session: Session):
         """
-        Delete all trace of messages stored for more than 31 days.
+        Delete all feedback messages stored for longer than the configured
+        `retention_time` (default: 90 days).
         In order to not store not necessary data.
         Parameters:
             - db_session: ORM database session

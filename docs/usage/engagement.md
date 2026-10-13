@@ -74,7 +74,8 @@ This module store in the database the following object.
 |-----------|----------|--------------|----------------|
 | `id` | `String` | ❌ | Unique identifier for the feedback message (matches the original message ID from the Status App). |
 | `public_key` | `String` | ❌ | Public key of the **user** who sent the feedback request. |
-| `response_timestamp` | `Datatime` | ❌ | Timestamp (Unix epoch) when the Status Team **replied** to the request. |
+| `request_timestamp` | `DateTime` | ❌ | Timestamp when the feedback request was **received**. |
+| `response_timestamp` | `DateTime` | ✅ | Timestamp when the Status Team **replied** to the request. |
 | `group_chat_message_id` | `String` | ✅ | ID of the message in the **feedback group chat** where the request was forwarded. |
 | `response_message` | `String` | ✅ | The **content** of the Status Team's reply. |
 | `reply_chat_id` | `String` | ✅ | ID of the **reply message** sent back to the user. |
@@ -125,7 +126,7 @@ It has different labels based on the types of actions done. Each counter label a
 - `sent-reply` – Reply successfully sent from the group chat to user.
 - `error-image-download` - An error happened during a image download
 - `contact-removed` - A user a removed the bot from his contact, the data are deleted
-- `periodic-message-del` - Remove feedback message older than 31 days
+- `periodic-message-del` - A feedback message older than the configured `retention_time` (default: 90 days) was removed
 
 #### `status_bot_engagement_periodic`
 

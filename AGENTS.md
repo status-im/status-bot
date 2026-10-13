@@ -33,7 +33,8 @@ for the module API (`BaseModule`, `ModuleType`, `ModuleContext`).
 - `status_bot/database.py` — `Database` wrapper (Postgres / SQLite) around SQLAlchemy; exposes `create_tables()`.
 - `status_bot/models/base.py` — Declarative `Base`, plus `namespace()` and `model_by_table()` helpers (re-exported from the top-level `status_bot` package).
 - `status_bot/metrics.py` — Prometheus metrics exporter startup.
-- `status_bot/models/` — SQLAlchemy ORM models (`ReceivedMessage`, `ReceivedChat`).
+- `status_bot/models/` — SQLAlchemy ORM models (`ReceivedMessage`, `ReceivedChat`,
+  `RawCommunityInfo`, `RawMessage`, `ContactRequest`, `FeedbackMessage`).
 - `status_bot/modules/` — built-in modules and the module framework.
 - `tests/` — pytest test suite.
 - `docs/` — user and development documentation.
@@ -81,8 +82,10 @@ These rules are mandatory for any new development in this repository.
 
 - All new development must be covered by tests.
 - Tests live in `tests/` (pytest), runnable with `pytest tests/`.
-- Prefer testing pure logic — e.g. the hashing/transform functions in
-  `status_bot/modules/receiver.py` (see `tests/test_receiver.py`), or database
+- Prefer testing pure logic — e.g. the message-to-row conversion
+  (`build_message_row`) in `status_bot/modules/receiver.py` and the encryption
+  helpers in `status_bot/modules/utils.py` (see `tests/test_receiver.py`,
+  `tests/test_utils.py`), or database
   inserts against an in-memory SQLite database (see `tests/test_database.py`) —
   rather than exercising the live Status backend.
 
@@ -95,7 +98,8 @@ The documentations is split between multiple subdirectories:
 
 ## Key configuration facts
 
-- Loading order: `config.yaml` → environment variables → `.env` file.
+- Loading order (highest priority first): keyword arguments passed to `Config(...)`,
+  environment variables, `.env` file, `config.yaml`.
 - `Config._yaml_file` defaults to `./config.yaml` and is set from the `--config`
   CLI flag before the `Config` instance is created.
 - Database is optional: if the required `database` settings are absent, the bot
