@@ -16,6 +16,7 @@ SECRET_KEYS = [
     "infura_token",
     "coingecko_api_key",
     "bot_hash_pepper",
+    "encryption_key",
 ]
 
 

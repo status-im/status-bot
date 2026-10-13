@@ -160,19 +160,22 @@ A module can declare `EVENT` alongside other types (e.g., `PERIODIC | EVENT`). I
 |----------|-------------|
 | `to_sha256_hash(value)` | Returns the SHA-256 hex digest of a string |
 | `to_hmac_sha256_hash(value, pepper)` | Returns the HMAC-SHA256 hex digest of a string, keyed with the `bot.bot_hash_pepper` config value. Falls back to plain `to_sha256_hash` (with a one-time warning) when the pepper is empty |
+| `derive_encryption_key(secret)` | Derives the AES-SIV key from `bot.encryption_key`: a hex/base64 encoded 32/48/64 byte value is used directly, any other value is stretched with PBKDF2-HMAC-SHA256. Warns once when the secret is empty |
+| `to_encrypted_value(value, key)` | Encrypts a string with AES-SIV (deterministic, authenticated) and returns it with an `enc1$` prefix |
+| `from_encrypted_value(value, key)` | Decrypts a value produced by `to_encrypted_value`; raises `ValueError` on tampering or a wrong key |
 | `to_midnight(timestamp)` | Truncates a datetime to the start of its day |
 | `save_file(file_path, data)` | Saves a DataFrame as CSV or pickles any other object |
 
 
 ## Message storage & privacy
 
-The `receiver` module persists received messages and chats to the configured Postgres database. Before insertion, identifying and content-bearing fields are hashed with `to_hmac_sha256_hash` so no human-readable user data is stored at rest:
+The `receiver` module persists received messages (as `status_sdk` `Message` objects) to the configured database. Before insertion, identifying and content-bearing fields are encrypted with `to_encrypted_value` (AES-256-SIV, key derived from `bot.encryption_key`) so no human-readable user data is stored at rest:
 
-- **Messages — deterministic (pepper only):** `id`, `from`, `response_to`, `chat_id`, `local_chat_id`, `display_name`, `ens_name`, `alias`, `text`. `id` stays stable so primary-key dedup keeps working.
-- **Chats — deterministic (pepper only):** `id`, `name`.
-- **Dropped entirely (messages):** `parsed_text`, `quoted_message`, `emoji_hash`, `gap_parameters`.
+- **Messages — deterministic (AES-SIV, no nonce):** `id`, `from`, `response_to`, `chat_id`, `text`. `id` stays stable so primary-key dedup keeps working.
+- `content_type` is stored as its integer value (`Content` enum unwrapped), `chat_type` as the enum member name (`PRIVATE`/`GROUP`/`COMMUNITY`) in `message_type`.
+- Columns without a counterpart on `Message` (`alias`, `contact_request_state`, `compressed_key`) stay `NULL`.
 
-Any unexpected column containing structured data (dict/list) is dropped with a logged warning rather than stored. The event payload is never modified — plaintext remains available in-memory for handling; only the persisted copy is hashed. Hashing is applied at insert time, so rows stored before this behavior was introduced are left as-is.
+The event payload is never modified — plaintext remains available in-memory for handling; only the persisted copy is encrypted. Rows written by versions that used HMAC-SHA256 hashing are not decryptable and must be purged (see [Privacy & storage](../deployment/configuration.md#privacy--storage)).
 
 
 ## Best practices

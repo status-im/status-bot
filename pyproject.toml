@@ -17,6 +17,7 @@ dependencies = [
     "status-sdk @ git+https://github.com/status-im/status-python-sdk.git@e3c68d8585894ad0118f979efe2e8597bd946fda",
     "pyyaml",
     "pandas",
+    "pycryptodome",
 ]
 
 [project.optional-dependencies]

@@ -1,3 +1,5 @@
+import base64
+import binascii
 import datetime
 import hmac
 import logging
@@ -9,6 +11,9 @@ import pandas as pd
 from typing import Any, Optional
 import requests
 
+from Crypto.Cipher import AES
+from Crypto.Hash import SHA256
+from Crypto.Protocol.KDF import PBKDF2
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
@@ -18,6 +23,16 @@ from status_sdk.types import Chat
 logger = logging.getLogger(__name__)
 
 _PEPPER_WARNED = False
+_EMPTY_KEY_WARNED = False
+
+# AES-SIV accepts 32, 48 or 64 byte keys (two keys of 16/24/32 bytes)
+_SIV_KEY_LENGTHS = (32, 48, 64)
+_PBKDF2_SALT = b"status-bot-receiver-v1"
+_PBKDF2_ITERATIONS = 200_000
+
+# Prefix marking a column value as an encrypted blob ("enc1" = format version 1).
+# Legacy values written as plain HMAC-SHA256 hex digests do not carry it.
+ENCRYPTION_PREFIX = "enc1$"
 
 
 def camel_to_snake(name: str) -> str:
@@ -49,6 +64,87 @@ def to_hmac_sha256_hash(value: str, pepper: str = "") -> str:
             "hashing (content is not protected against dictionary attacks)"
         )
     return to_sha256_hash(value)
+
+
+def _decode_raw_key(secret: str) -> Optional[bytes]:
+    """
+    Decode a hex or base64 encoded AES-SIV key.
+
+    Returns `None` when the secret is not an encoded key of a valid length,
+    in which case it is treated as a passphrase (see `derive_encryption_key`).
+    """
+    decoders = (
+        lambda value: bytes.fromhex(value),
+        lambda value: base64.b64decode(value, validate=True),
+        lambda value: base64.urlsafe_b64decode(value),
+    )
+    for decoder in decoders:
+        try:
+            raw = decoder(secret)
+        except (ValueError, binascii.Error):
+            continue
+        if len(raw) in _SIV_KEY_LENGTHS:
+            return raw
+    return None
+
+
+def derive_encryption_key(secret: str) -> bytes:
+    """
+    Derive the AES-SIV key used to encrypt stored messages from `bot.encryption_key`.
+
+    A hex or base64 encoded 32/48/64 byte value is used as the key directly,
+    any other value is stretched with PBKDF2-HMAC-SHA256.
+
+    An empty secret still yields a key (so persistence keeps working and dedup
+    stays stable), but a warning is logged: the stored values are then only
+    obfuscated and recoverable by anyone with access to the database.
+    """
+    global _EMPTY_KEY_WARNED
+    if not secret and not _EMPTY_KEY_WARNED:
+        _EMPTY_KEY_WARNED = True
+        logger.warning(
+            "bot.encryption_key is not set, deriving the encryption key from an "
+            "empty secret (stored messages are NOT protected)"
+        )
+    raw = _decode_raw_key(secret) if secret else None
+    if raw is not None:
+        return raw
+    return PBKDF2(
+        secret.encode(),
+        _PBKDF2_SALT,
+        dkLen=64,
+        count=_PBKDF2_ITERATIONS,
+        hmac_hash_module=SHA256,
+    )
+
+
+def to_encrypted_value(value: str, key: bytes) -> str:
+    """
+    Encrypt a string with AES-SIV (deterministic, authenticated).
+
+    Deterministic means the same plaintext always yields the same ciphertext,
+    which keeps primary-key dedup working on encrypted identifiers.
+    The result is `ENCRYPTION_PREFIX` + urlsafe base64(synthetic IV + ciphertext).
+    """
+    cipher = AES.new(key, AES.MODE_SIV)
+    ciphertext, mac = cipher.encrypt_and_digest(value.encode())
+    blob = base64.urlsafe_b64encode(mac + ciphertext).decode()
+    return ENCRYPTION_PREFIX + blob
+
+
+def from_encrypted_value(value: str, key: bytes) -> str:
+    """
+    Decrypt a value produced by `to_encrypted_value`.
+
+    Raises `ValueError` when the value is not an encrypted blob of this format
+    or when it was tampered with / encrypted with another key.
+    """
+    if not value.startswith(ENCRYPTION_PREFIX):
+        raise ValueError(f"Value is not an encrypted blob: {value[:32]!r}...")
+    blob = base64.urlsafe_b64decode(value[len(ENCRYPTION_PREFIX) :])
+    mac, ciphertext = blob[:16], blob[16:]
+    cipher = AES.new(key, AES.MODE_SIV)
+    return cipher.decrypt_and_verify(ciphertext, mac).decode()
 
 
 def to_midnight(timestamp: datetime.datetime) -> datetime.datetime:

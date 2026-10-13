@@ -21,28 +21,12 @@ def _get_package_version() -> str:
 
 __version__ = _get_package_version()
 
-_MESSAGE_DETERMINISTIC_COLUMNS = [
+_MESSAGE_ENCRYPTED_COLUMNS = [
     "id",
     "from",
     "response_to",
     "chat_id",
-    "local_chat_id",
-    "display_name",
-    "ens_name",
-    "alias",
     "text",
-]
-
-_MESSAGE_DROP_COLUMNS = [
-    "parsed_text",
-    "quoted_message",
-    "emoji_hash",
-    "gap_parameters",
-]
-
-_CHAT_DETERMINISTIC_COLUMNS = [
-    "id",
-    "name",
 ]
 
 

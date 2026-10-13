@@ -8,7 +8,6 @@ from prometheus_client import Counter
 
 from .base import BaseModule, ModuleConfig, ModuleContext, ModuleType
 from status_bot.config import ModulesConfig
-from status_bot.constants import EventTypeEnum
 from status_bot import Database
 from status_sdk import Account
 

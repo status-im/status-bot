@@ -23,14 +23,13 @@ def test_insert_and_read_back_via_orm():
                 whisper_timestamp=datetime.datetime(2024, 1, 1, 12, 0, 0),
                 from_="0xuser",
                 alias="Ali",
-                seen=True,
-                rtl=False,
-                line_count=2,
                 text="hello world",
                 chat_id="chat-1",
-                local_chat_id="local-chat-1",
-                ens_name="alice.eth",
-                display_name="Alice",
+                response_to="msg-0",
+                content_type=1,
+                message_type="PRIVATE",
+                contact_request_state=2,
+                compressed_key="zQ3...",
                 received_timestamp=datetime.datetime(2024, 1, 1, 12, 0, 0),
             )
         )
@@ -44,14 +43,14 @@ def test_insert_and_read_back_via_orm():
     assert message.id == "msg-1"
     assert message.whisper_timestamp == datetime.datetime(2024, 1, 1, 12, 0, 0)
     assert message.from_ == "0xuser"
+    assert message.alias == "Ali"
     assert message.text == "hello world"
     assert message.chat_id == "chat-1"
-    assert message.local_chat_id == "local-chat-1"
-    assert message.ens_name == "alice.eth"
-    assert message.display_name == "Alice"
-    assert message.line_count == 2
-    assert message.seen is True
-    assert message.rtl is False
+    assert message.response_to == "msg-0"
+    assert message.content_type == 1
+    assert message.message_type == "PRIVATE"
+    assert message.contact_request_state == 2
+    assert message.compressed_key == "zQ3..."
     assert message.received_timestamp == datetime.datetime(2024, 1, 1, 12, 0, 0)
 
 
