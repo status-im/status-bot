@@ -238,7 +238,8 @@ class ModuleManager:
             self._stop_event.wait(interval)
 
     def _run_event_listener(self) -> None:
-        for message in self._account.listen_messages():
+        for message in self._account.listen_events():
+            logger.debug(f"New message {message.id}, {message.content}")
             if self._stop_event.is_set():
                 break
             try:
