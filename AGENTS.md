@@ -101,5 +101,5 @@ The documentations is split between multiple subdirectories:
 - Database is optional: if the required `database` settings are absent, the bot
   runs without persistence.
 - Secrets (bot password, mnemonic phrase, API keys, database password, hash
-  pepper) are redacted as `[REDACTED]` from logs when `setup_logging(config)` is
-  called with the loaded configuration.
+  pepper, encryption key) are redacted as `[REDACTED]` from logs when
+  `setup_logging(config)` is called with the loaded configuration.

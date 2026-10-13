@@ -1,5 +1,4 @@
 import logging
-import json
 
 from typing import Optional
 from datetime import datetime, timedelta
@@ -125,7 +124,7 @@ class Engagement(BaseModule):
             id=message.id,
             public_key=message.from_public_key,
             request_timestamp=message.timestamp,
-            is_new_user=message.content == self.settings.get("new_user_message_contact_request", ""),
+            is_new_user=message.content == self.settings.get("new_user_message_contact_request"),
         )
         self._counter.labels(type="received_request").inc()
         self.account.add_contact(public_key=new_contact.public_key, request_id=message.id)
@@ -184,9 +183,7 @@ class Engagement(BaseModule):
         feedback_keywords = self.settings.get("feedback_keywords", [])
         return any(kw in message.content.lower() for kw in feedback_keywords)
 
-    def send_message(
-        self, chat_id: str, original_message: Message, reply_id: Optional[str]
-    ):
+    def send_message(self, chat_id: str, original_message: Message, reply_id: Optional[str]):
         """
         Send message to either the group chat or the user.
         Download an image with there is an image to transfer.
@@ -198,7 +195,9 @@ class Engagement(BaseModule):
         Ouput:
             - message id
         """
-        logger.info(f"Original received : {original_message.content_type} - {original_message.image_urls}")
+        logger.info(
+            f"Original received : {original_message.content_type} - {original_message.image_urls}"
+        )
         send_msg_id = None
         if len(original_message.image_urls) == 0:
             send_msg_id = self.account.send_message(
@@ -222,12 +221,12 @@ class Engagement(BaseModule):
             except Exception as e:
                 logger.error(e)
                 self._counter.labels(type="error-image-download").inc()
-                message_to_send=f"{message_to_send} {REPLY_MSG_ERROR_IMG}"
+                message_to_send = f"{message_to_send} {REPLY_MSG_ERROR_IMG}"
         send_msg_id = self.account.send_image(
-          chat_id=chat_id,
-          file_paths=images_path,
-          message=message_to_send,
-          reply_to_message_id=reply_id,
+            chat_id=chat_id,
+            file_paths=images_path,
+            message=message_to_send,
+            reply_to_message_id=reply_id,
         )
         logger.info("after send")
         return send_msg_id
@@ -294,9 +293,9 @@ class Engagement(BaseModule):
             return
         logger.debug(f"Sending reply to message {original_message.id}")
         reply_id = self.send_message(
-          chat_id=original_message.public_key,
-          original_message=message,
-          reply_id=original_message.id
+            chat_id=original_message.public_key,
+            original_message=message,
+            reply_id=original_message.id,
         )
         self._counter.labels(type="sent-reply").inc()
         original_message.response_message = message.content

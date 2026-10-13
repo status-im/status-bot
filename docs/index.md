@@ -49,6 +49,7 @@ bot:
     alchemy_token: 'Your Alchemy token'
     coingecko_api_key: 'Your Coingecko API key'
     bot_hash_pepper: 'your-secret-pepper'
+    encryption_key: 'your-secret-encryption-key'
 ```
 
 ### Importing Status Account

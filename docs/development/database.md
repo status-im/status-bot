@@ -84,7 +84,7 @@ with self.ctx.db.session() as session:
     rows = session.execute(select(Visit)).scalars().all()
 ```
 
-Built-in modules follow the same contract: `receiver` converts raw event dicts directly into `ReceivedMessage`/`ReceivedChat` instances and writes them in one batch; `communities_monitoring` uses `session.merge()` for primary-key upserts. Since `self.ctx.db` may be `None`, modules always guard before touching the database.
+Built-in modules follow the same contract: `receiver` converts each received `status_sdk` `Message` into a `ReceivedMessage` row (encrypting identifying and content-bearing columns) and commits it; `communities_monitoring` uses `session.merge()` for primary-key upserts. Since `self.ctx.db` may be `None`, modules always guard before touching the database.
 
 ## Thread model
 

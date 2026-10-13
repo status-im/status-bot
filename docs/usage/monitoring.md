@@ -6,62 +6,26 @@ The Status Bot can store the messages and Community information to allow some an
 
 The messages received by the bot account can be store in the database with the module `receiver`.
 
-Data from `Messages` and `Chats` are hashed with sha256 and a pepper, to avoid storing information openly.
+Data from `Messages` are encrypted with AES-256-SIV (deterministic, authenticated) using the secret configured in `bot.encryption_key`, so no human-readable user data is stored at rest. Encrypted values carry an `enc1$` prefix; use `status_bot.modules.utils.from_encrypted_value(value, key)` to read them back.
 
 ### Messages
 
-| Field | Type | Hashed | Description |
+| Field | Type | Encrypted | Description |
 |----|----|----|---|
-| id | String | Hashed | Message Id |
-| whisper_timestamp | - | DateTime | Timstamp of reception by the last network node |
-| from_ | String | Hashed | Address of the sender |
-| alias | String | Hashed | User Alias |
-| seen | Boolean | - | Flag indicating if the message has been seen |
-| rtl | Boolean | - | Flag indicating |
-| line_count | Integer | - | |
-| text | String | Hashed | Content of the messages |
-| chat_id | String | Hashed | Id of the chat link to this message |
-| local_chat_id | String | Hashed | Chat id for the local backend instance |
-| clock | BigInteger | - | Unix timestamp of the message reception |
-| replace | String | - | |
-| response_to | String | Hashed | User Id to whom the message is responding |
-| ens_name | String | Hashed | ENS name of the sender |
-| display_name | String | Hashed | Display Name of the sender |
-| timestamp | DateTime | - | timestamp of the message sent |
-| content_type | Integer | - | Number indicating the type of message content |
-| message_type | Integer | - | Type of message |
-| contact_request_state | Integer | - | |
-| compressed_key | String | - | Key used to compress the message |
-| received_timestamp | DateTime | - | timestamp of the message reception |
+| id | String | Encrypted | Message Id (deterministic, used for dedup) |
+| whisper_timestamp | DateTime | - | Timestamp of reception by the last network node |
+| from_ | String | Encrypted | Address of the sender |
+| alias | String | - | User Alias (`NULL`, not provided by the SDK anymore) |
+| text | String | Encrypted | Content of the messages |
+| chat_id | String | Encrypted | Id of the chat link to this message |
+| response_to | String | Encrypted | Id of the message this message replies to (`NULL` when not a reply) |
+| content_type | Integer | - | Number indicating the type of message content (`Content` enum value: 1 text, 2 sticker, 4 emoji, 7 image, 18 bridged, …) |
+| message_type | String | - | Type of chat the message was sent in: `PRIVATE`, `GROUP` or `COMMUNITY` |
+| contact_request_state | Integer | - | (`NULL`, not provided by the SDK anymore) |
+| compressed_key | String | - | (`NULL`, not provided by the SDK anymore) |
+| received_timestamp | DateTime | - | timestamp of the message reception by the bot |
 
-### Chats
-
-| Field | Type | Hashed | Description |
-|----|----|----|----|
-| id | String | | |
-| type | String | | |
-| name | String | | |
-| received_timestamp | DateTime | | |
-| description | String | | |
-| color | String | | |
-| emoji | String | | |
-| active | Boolean | | |
-| viewers_can_post_reactions | Boolean | | |
-| chat_type | Integer | | |
-| timestamp | DateTime | | |
-| last_clock_value | BigInteger | | |
-| deleted_at_clock_value | Integer | | |
-| read_messages_at_clock_value | Integer | | |
-| unviewed_messages_count | Integer | | |
-| unviewed_mentions_count | Integer | | |
-| membership_update_events | Integer | | |
-| identicon | String | | |
-| muted | Boolean | | |
-| mute_till | DateTime | | |
-| community_id | String | | |
-| category_id | String | | |
-| joined | String | | |
-
+> **Upgrading from the previous HMAC-SHA256 scheme:** legacy rows are one-way hashes and can never be decrypted. Purge them before restarting with the new version: `DELETE FROM received_messages;`. The `received_chats` table is no longer written by the `receiver` module (events only carry messages) and can be dropped as well.
 
 ## Community Monitoring
 
