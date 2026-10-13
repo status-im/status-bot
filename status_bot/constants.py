@@ -1,4 +1,3 @@
-from enum import Enum
 from importlib.metadata import version as _get_version, PackageNotFoundError
 from pathlib import Path
 import re
@@ -21,39 +20,10 @@ def _get_package_version() -> str:
 
 __version__ = _get_package_version()
 
-_MESSAGE_DETERMINISTIC_COLUMNS = [
+_MESSAGE_ENCRYPTED_COLUMNS = [
     "id",
     "from",
     "response_to",
     "chat_id",
-    "local_chat_id",
-    "display_name",
-    "ens_name",
-    "alias",
     "text",
 ]
-
-_MESSAGE_DROP_COLUMNS = [
-    "parsed_text",
-    "quoted_message",
-    "emoji_hash",
-    "gap_parameters",
-]
-
-_CHAT_DETERMINISTIC_COLUMNS = [
-    "id",
-    "name",
-]
-
-
-class EventTypeEnum(Enum):
-    MESSAGE = "messages.new"
-    LOCAL_NOTIFICATION = "local-notifications"
-
-
-class NotificationCategoryEnum(Enum):
-    CONTACT_REQUEST = "contactRequest"
-    NEW_MESSAGE = "newMessage"
-    GROUP_INVITE = "groupInvite"
-    COMMUNITY_REQUEST_TO_JOIN = "communityRequestToJoin"
-    COMMUNITY_JOINED = "communityJoined"

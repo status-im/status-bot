@@ -14,9 +14,10 @@ dependencies = [
     "psycopg2-binary",
     "sqlalchemy==2.0.54",
     "prometheus-client",
-    "status-sdk==1.1.4",
+    "status-sdk @ git+https://github.com/status-im/status-python-sdk.git@791176d114386df9939d5a24ab1e7c1773c10536",
     "pyyaml",
     "pandas",
+    "pycryptodome",
 ]
 
 [project.optional-dependencies]

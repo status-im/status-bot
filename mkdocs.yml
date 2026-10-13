@@ -23,6 +23,7 @@ nav:
   - index.md
   - Usage:
       - Messaging: usage/messaging.md
+      - Engagement: usage/engagement.md
       - Monitoring: usage/monitoring.md
   - Deployment:
       - Configuration: deployment/configuration.md

@@ -15,7 +15,7 @@ SECRET_KEYS = [
     "mnemonic_phrase",
     "infura_token",
     "coingecko_api_key",
-    "bot_hash_pepper",
+    "encryption_key",
 ]
 
 

@@ -8,8 +8,8 @@ Modules can declare one or more types. The behavior is composed from the declare
 
 | Type | Behaviour |
 |------|-----------|
-| `PERIODIC` | Calls `execute()` in a loop, sleeping `interval` seconds between runs |
-| `EVENT` | Receives WebSocket signal events via `on_event()` (centralized listener) |
+| `PERIODIC` | Calls `execute()` in a loop, sleeping `interval` minutes between runs |
+| `EVENT` | Receives messages via `on_event()` (centralized listener) |
 | `SERVICE` | Calls `execute()` once. Expected to block until shutdown |
 
 **Combination examples:**
@@ -20,6 +20,7 @@ Modules can declare one or more types. The behavior is composed from the declare
 
 ```python
 from status_bot.modules.base import BaseModule, ModuleType
+from status_sdk.models import Message
 
 class MyModule(BaseModule):
 
@@ -36,8 +37,8 @@ class MyModule(BaseModule):
     def on_stop(self):
         ...  # called once when the module stops
 
-    def on_event(self, event_type: str, event: dict):
-        ...  # handle a signal event (EVENT type only)
+    def on_event(self, message: Message):
+        ...  # handle a received message (EVENT type only)
 
     def register_metrics(self):
         ...  # optional: register Prometheus metrics
@@ -68,10 +69,6 @@ Module name (from configuration).
 
 Module-specific settings dictionary from `config.yaml`.
 
-#### `is_running`
-
-Boolean indicating whether the module is currently running.
-
 #### `ctx`
 
 Every module receives a `ModuleContext` via the constructor, accessible as `self.ctx`:
@@ -80,7 +77,7 @@ Every module receives a `ModuleContext` via the constructor, accessible as `self
 |-------|------|-------------|
 | `account` | `Account` | Logged-in Status account |
 | `config` | `ModuleConfig` | This module's configuration |
-| `db` | `Postgres / None` | Optional Postgres connection |
+| `db` | `Database / None` | Optional database connection (Postgres or SQLite) |
 | `shared_state` | `dict` | Cross-module shared data |
 | `stop_event` | `threading.Event` | Set when the bot is shutting down |
 
@@ -90,7 +87,7 @@ Each module receives only its own settings from `config.yaml`:
 
 ```python
 self.ctx.config.name        # module identifier
-self.ctx.config.interval    # seconds between PERIODIC runs
+self.ctx.config.interval    # minutes between PERIODIC runs
 self.ctx.config.max_retries # restart attempts before permanent failure
 self.ctx.config.settings    # dict of module-specific settings
 ```
@@ -110,8 +107,8 @@ The central `api_server` module owns the uvicorn lifecycle. Other modules regist
 class MyAPIModule(BaseModule):
 
     @property
-    def module_type(self) -> ModuleType:
-        return ModuleType.SERVICE
+    def module_type(self) -> set[ModuleType]:
+        return {ModuleType.SERVICE}
 
     def on_start(self):
         app = self.ctx.shared_state["fastapi_app"]
@@ -126,12 +123,12 @@ class MyAPIModule(BaseModule):
         self.ctx.stop_event.wait()  # block until shutdown
 ```
 
-The `api_server` module is auto-loaded whenever any API module is enabled and `api.enable` is `true`.
+The `api_server` module is auto-loaded whenever `api.enable` is `true` — it does not need to be listed in `enabled`.
 
 
 ## Signals and EVENT modules
 
-Modules declaring `ModuleType.EVENT` in their `module_type` set receive WebSocket signal events via `on_event()`. The centralized signal listener delivers events to all such modules.
+Modules declaring `ModuleType.EVENT` in their `module_type` set receive every incoming message as a `status_sdk` `Message` object via `on_event()`. The centralized signal listener (`Account.listen_messages()`) delivers the messages to all such modules.
 
 ```python
 class AutoReplyModule(BaseModule):
@@ -143,10 +140,8 @@ class AutoReplyModule(BaseModule):
     def on_start(self):
         self._commands = self.ctx.config.settings.get("commands", {})
 
-    def on_event(self, event_type: str, event: dict):
-        messages = event.get("event", {}).get("messages", [])
-        for msg in messages:
-            self.ctx.account.send_message(msg["chatId"], "Message received")
+    def on_event(self, message: Message):
+        self.ctx.account.send_message(message.chat_id, "Message received")
 ```
 
 A module can declare `EVENT` alongside other types (e.g., `PERIODIC | EVENT`). In that case, it both receives signal events and has its `execute()` called periodically. The signal listener respects `stop_event` for graceful shutdown.
@@ -159,20 +154,21 @@ A module can declare `EVENT` alongside other types (e.g., `PERIODIC | EVENT`). I
 | Function | Description |
 |----------|-------------|
 | `to_sha256_hash(value)` | Returns the SHA-256 hex digest of a string |
-| `to_hmac_sha256_hash(value, pepper)` | Returns the HMAC-SHA256 hex digest of a string, keyed with the `bot.bot_hash_pepper` config value. Falls back to plain `to_sha256_hash` (with a one-time warning) when the pepper is empty |
+| `derive_encryption_key(secret)` | Derives the AES-SIV key from `bot.encryption_key`: a hex/base64 encoded 32/48/64 byte value is used directly, any other value is stretched with PBKDF2-HMAC-SHA256. Warns once when the secret is empty |
+| `to_encrypted_value(value, key)` | Encrypts a string with AES-SIV (deterministic, authenticated) and returns it with an `enc1$` prefix |
+| `from_encrypted_value(value, key)` | Decrypts a value produced by `to_encrypted_value`; raises `ValueError` on tampering or a wrong key |
 | `to_midnight(timestamp)` | Truncates a datetime to the start of its day |
-| `save_file(file_path, data)` | Saves a DataFrame as CSV or pickles any other object |
 
 
 ## Message storage & privacy
 
-The `receiver` module persists received messages and chats to the configured Postgres database. Before insertion, identifying and content-bearing fields are hashed with `to_hmac_sha256_hash` so no human-readable user data is stored at rest:
+The `receiver` module persists received messages (as `status_sdk` `Message` objects) to the configured database. Before insertion, identifying and content-bearing fields are encrypted with `to_encrypted_value` (AES-256-SIV, key derived from `bot.encryption_key`) so no human-readable user data is stored at rest:
 
-- **Messages — deterministic (pepper only):** `id`, `from`, `response_to`, `chat_id`, `local_chat_id`, `display_name`, `ens_name`, `alias`, `text`. `id` stays stable so primary-key dedup keeps working.
-- **Chats — deterministic (pepper only):** `id`, `name`.
-- **Dropped entirely (messages):** `parsed_text`, `quoted_message`, `emoji_hash`, `gap_parameters`.
+- **Messages — deterministic (AES-SIV, no nonce):** `id`, `from`, `response_to`, `chat_id`, `text`. `id` stays stable so primary-key dedup keeps working.
+- `content_type` is stored as its integer value (`Content` enum unwrapped), `chat_type` as the enum member name (`PRIVATE`/`GROUP`/`COMMUNITY`) in `message_type`.
+- Columns without a counterpart on `Message` (`alias`, `contact_request_state`, `compressed_key`) stay `NULL`.
 
-Any unexpected column containing structured data (dict/list) is dropped with a logged warning rather than stored. The event payload is never modified — plaintext remains available in-memory for handling; only the persisted copy is hashed. Hashing is applied at insert time, so rows stored before this behavior was introduced are left as-is.
+The event payload is never modified — plaintext remains available in-memory for handling; only the persisted copy is encrypted. Rows written by versions that used HMAC-SHA256 hashing are not decryptable and must be purged (see [Privacy & storage](../deployment/configuration.md#privacy--storage)).
 
 
 ## Best practices

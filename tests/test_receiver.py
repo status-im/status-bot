@@ -1,236 +1,219 @@
 import datetime
-import hmac
-from hashlib import sha256
+from types import SimpleNamespace
 
+import pytest
 from sqlalchemy import select
 
 from status_bot.database import Database
-from status_bot.models.chat import ReceivedChat
 from status_bot.models.message import ReceivedMessage
 from status_bot.modules import receiver
 from status_bot.modules.base import ModuleConfig, ModuleContext
+from status_bot.modules.utils import (
+    ENCRYPTION_PREFIX,
+    derive_encryption_key,
+    from_encrypted_value,
+)
+
+from status_sdk import types
+from status_sdk.models import Message
+
+KEY = derive_encryption_key("test-secret")
+OTHER_KEY = derive_encryption_key("other-secret")
 
 
-def _hashed(value):
-    return hmac.new(b"test-pepper", value.encode(), sha256).hexdigest()
-
-
-def _message_payload():
-    return {
+def _message(**overrides) -> Message:
+    params = {
         "id": "msg-1",
-        "whisper_timestamp": 1700000000000,
-        "timestamp": 1700000000000,
-        "from": "0xuser",
-        "alias": "Ali",
-        "seen": True,
-        "text": "hello world",
-        "chatId": "chat-1",
-        "localChatId": "local-chat-1",
-        "responseTo": "msg-0",
-        "displayName": "Alice",
-        "ensName": "alice.eth",
-        "parsedText": {"body": "hello world"},
-        "quotedMessage": {"text": "original"},
-        "emojiHash": ["1f600"],
-        "gapParameters": {"link": "https://example.com"},
-        "salt": "not-a-model-column",
+        "chat_id": "chat-1",
+        "content": "hello world",
+        "content_type": types.Content.TEXT,
+        "from_public_key": "0xuser",
+        "timestamp": datetime.datetime.fromtimestamp(1700000000),
+        "chat_type": types.Chat.PRIVATE,
+        "source": "status",
     }
+    params.update(overrides)
+    return Message(**params)
 
 
-def test_message_deterministic_fields_hashed_with_pepper():
-    rows = receiver.build_model_rows(
-        [_message_payload()],
-        ReceivedMessage,
-        receiver._MESSAGE_DETERMINISTIC_COLUMNS,
-        receiver._MESSAGE_DROP_COLUMNS,
-        pepper="test-pepper",
-    )
-
-    row = rows[0]
-    for value, attr in [
-        ("msg-1", "id"),
-        ("0xuser", "from_"),
-        ("msg-0", "response_to"),
-        ("chat-1", "chat_id"),
-        ("local-chat-1", "local_chat_id"),
-        ("Alice", "display_name"),
-        ("alice.eth", "ens_name"),
-        ("Ali", "alias"),
-        ("hello world", "text"),
-    ]:
-        assert getattr(row, attr) == _hashed(value)
-
-    assert row.seen is True
-
-
-def test_camel_case_keys_map_to_snake_attributes():
-    rows = receiver.build_model_rows(
-        [{"chatId": "chat-1", "localChatId": "local-chat-1", "displayName": "Alice"}],
-        ReceivedMessage,
-        [],
-        [],
-    )
-
-    row = rows[0]
-    assert row.chat_id == "chat-1"
-    assert row.local_chat_id == "local-chat-1"
-    assert row.display_name == "Alice"
-
-
-def test_structured_values_skipped_per_row():
-    payload = _message_payload()
-    payload["message_type"] = [0]
-    payload["content_type"] = {"a": 1}
-
-    rows = receiver.build_model_rows([payload], ReceivedMessage, [], [])
-
-    row = rows[0]
-    assert row.message_type is None
-    assert row.content_type is None
-
-
-def test_non_model_columns_skipped():
-    rows = receiver.build_model_rows([_message_payload()], ReceivedMessage, [], [])
-
-    assert not hasattr(rows[0], "salt")
-
-
-def test_ms_timestamps_coerced_to_datetime():
-    rows = receiver.build_model_rows([_message_payload()], ReceivedMessage, [], [])
-
-    row = rows[0]
-    expected = datetime.datetime.fromtimestamp(1700000000000 / 1000)
-    assert isinstance(row.timestamp, datetime.datetime)
-    assert isinstance(row.whisper_timestamp, datetime.datetime)
-    assert row.timestamp == expected
-    assert row.whisper_timestamp == expected
-
-
-def test_drop_columns_removed_before_hashing():
-    rows = receiver.build_model_rows(
-        [_message_payload()],
-        ReceivedMessage,
-        receiver._MESSAGE_DETERMINISTIC_COLUMNS,
-        ["text"],
-        pepper="test-pepper",
-    )
-
-    assert rows[0].text is None
-
-
-def test_none_values_stored_as_null():
-    payload = _message_payload()
-    payload["display_name"] = None
-
-    rows = receiver.build_model_rows([payload], ReceivedMessage, [], [])
-
-    assert rows[0].display_name is None
-
-
-def test_empty_pepper_uses_plain_sha256():
-    rows = receiver.build_model_rows(
-        [_message_payload()],
-        ReceivedMessage,
-        receiver._MESSAGE_DETERMINISTIC_COLUMNS,
-        receiver._MESSAGE_DROP_COLUMNS,
-        pepper="",
-    )
-
-    assert rows[0].chat_id == sha256("chat-1".encode()).hexdigest()
-    assert rows[0].chat_id != _hashed("chat-1")
-
-
-def test_chat_deterministic_fields_hashed_and_plain_fields_kept():
-    rows = receiver.build_model_rows(
-        [{"id": "chat-1", "name": "General", "type": "public"}],
-        ReceivedChat,
-        receiver._CHAT_DETERMINISTIC_COLUMNS,
-        [],
-        pepper="test-pepper",
-    )
-
-    row = rows[0]
-    assert row.id == _hashed("chat-1")
-    assert row.name == _hashed("General")
-    assert row.type == "public"
-
-
-def _receiver_module(db) -> receiver.ReceiverModule:
+def _receiver_module(db, secret="test-secret") -> receiver.ReceiverModule:
+    config = SimpleNamespace(bot=SimpleNamespace(encryption_key=secret))
     ctx = ModuleContext(
         account=None,
         config=ModuleConfig(name="receiver", settings={}),
         db=db,
-        shared_state={},
+        shared_state={"config": config},
     )
     module = receiver.ReceiverModule(ctx)
     module.start()
     return module
 
 
-def test_process_and_insert_persists_rows_via_session():
+def _stored_messages(db):
+    with db.session() as session:
+        return session.execute(select(ReceivedMessage)).scalars().all()
+
+
+def test_build_message_row_encrypts_content_and_identifiers():
+    row = receiver.build_message_row(_message(), KEY)
+
+    assert from_encrypted_value(row.text, KEY) == "hello world"
+    assert from_encrypted_value(row.id, KEY) == "msg-1"
+    assert from_encrypted_value(row.chat_id, KEY) == "chat-1"
+    assert from_encrypted_value(row.from_, KEY) == "0xuser"
+
+
+def test_build_message_row_encrypts_reply_id():
+    row = receiver.build_message_row(_message(reply_id="msg-0"), KEY)
+    assert from_encrypted_value(row.response_to, KEY) == "msg-0"
+
+
+def test_build_message_row_encryption_is_deterministic():
+    first = receiver.build_message_row(_message(), KEY)
+    second = receiver.build_message_row(_message(), KEY)
+
+    # Same plaintext -> same ciphertext, so primary-key dedup keeps working
+    assert first.id == second.id
+    assert first.text == second.text
+    assert first.chat_id == second.chat_id
+
+
+def test_build_message_row_encryption_differs_across_keys():
+    row = receiver.build_message_row(_message(), KEY)
+    other = receiver.build_message_row(_message(), OTHER_KEY)
+
+    assert row.text != other.text
+    with pytest.raises(ValueError):
+        from_encrypted_value(row.text, OTHER_KEY)
+
+
+def test_build_message_row_encrypted_columns_follow_constants():
+    row = receiver.build_message_row(_message(reply_id="msg-0"), KEY)
+
+    for column in receiver._MESSAGE_ENCRYPTED_COLUMNS:
+        attribute = receiver._COLUMN_TO_ATTRIBUTE[column]
+        value = getattr(row, attribute)
+        assert value.startswith(ENCRYPTION_PREFIX), column
+
+    # No plaintext leaks in the persisted row
+    assert "hello world" not in str(row.__dict__.values())
+    assert "0xuser" not in str(row.__dict__.values())
+
+
+def test_build_message_row_content_type_enum_stored_as_int():
+    row = receiver.build_message_row(_message(content_type=types.Content.IMAGE), KEY)
+    assert row.content_type == types.Content.IMAGE.value
+
+
+def test_build_message_row_raw_int_content_type_preserved():
+    # content types without an enum branch in the SDK stay raw ints
+    row = receiver.build_message_row(_message(content_type=11), KEY)
+    assert row.content_type == 11
+
+
+def test_build_message_row_chat_type_stored_as_enum_name():
+    row = receiver.build_message_row(_message(chat_type=types.Chat.GROUP), KEY)
+    assert row.message_type == "GROUP"
+
+
+def test_build_message_row_none_reply_id_stored_as_null():
+    row = receiver.build_message_row(_message(reply_id=None), KEY)
+    assert row.response_to is None
+
+
+def test_build_message_row_timestamps():
+    timestamp = datetime.datetime.fromtimestamp(1700000000)
+    row = receiver.build_message_row(_message(timestamp=timestamp), KEY)
+
+    assert row.whisper_timestamp == timestamp
+    assert isinstance(row.received_timestamp, datetime.datetime)
+    assert row.received_timestamp <= datetime.datetime.now()
+
+
+def test_build_message_row_columns_without_message_field_stay_null():
+    row = receiver.build_message_row(_message(), KEY)
+
+    assert row.alias is None
+    assert row.contact_request_state is None
+    assert row.compressed_key is None
+
+
+def test_on_event_persists_encrypted_row():
     db = Database("sqlite", host="", port=0, user="", password="", name=":memory:")
     db.create_tables()
     module = _receiver_module(db)
 
-    module._process_and_insert(
-        [_message_payload()],
-        ReceivedMessage,
-        receiver._MESSAGE_DETERMINISTIC_COLUMNS,
-        receiver._MESSAGE_DROP_COLUMNS,
-    )
+    module.on_event(_message())
 
-    with db.session() as session:
-        messages = session.execute(select(ReceivedMessage)).scalars().all()
-
+    messages = _stored_messages(db)
     assert len(messages) == 1
     message = messages[0]
-    assert message.chat_id == sha256("chat-1".encode()).hexdigest()
+    assert from_encrypted_value(message.text, KEY) == "hello world"
+    assert from_encrypted_value(message.chat_id, KEY) == "chat-1"
+    assert message.content_type == types.Content.TEXT.value
+    assert message.message_type == "PRIVATE"
     assert isinstance(message.received_timestamp, datetime.datetime)
-    expected = datetime.datetime.fromtimestamp(1700000000000 / 1000)
-    assert isinstance(message.timestamp, datetime.datetime)
-    assert isinstance(message.whisper_timestamp, datetime.datetime)
-    assert message.timestamp == expected
-    assert message.whisper_timestamp == expected
 
 
-def test_process_and_insert_drops_non_model_columns():
+def test_on_event_skips_duplicate_ids():
     db = Database("sqlite", host="", port=0, user="", password="", name=":memory:")
     db.create_tables()
     module = _receiver_module(db)
 
-    module._process_and_insert(
-        [_message_payload()],
-        ReceivedMessage,
-        receiver._MESSAGE_DETERMINISTIC_COLUMNS,
-        receiver._MESSAGE_DROP_COLUMNS,
-    )
+    module.on_event(_message())
+    module.on_event(_message())
 
-    with db.session() as session:
-        messages = session.execute(select(ReceivedMessage)).scalars().all()
+    assert len(_stored_messages(db)) == 1
 
+
+def test_on_event_without_database_is_disabled():
+    module = _receiver_module(None)
+
+    module.on_event(_message())  # must not raise
+
+
+def test_on_event_with_empty_key_still_persists():
+    db = Database("sqlite", host="", port=0, user="", password="", name=":memory:")
+    db.create_tables()
+    module = _receiver_module(db, secret="")  # fail open: warn and still persist
+
+    module.on_event(_message())
+
+    messages = _stored_messages(db)
     assert len(messages) == 1
-    assert not hasattr(messages[0], "salt")
+    assert messages[0].text.startswith(ENCRYPTION_PREFIX)
 
 
-def test_process_and_insert_skips_duplicate_primary_keys():
+def test_on_event_with_message_parsed_by_sdk():
+    # Same path as the event stream: raw status-go payload -> Message.from_raw
+    raw = {
+        "id": "0ximage-msg",
+        "chatId": "chat-1",
+        "from": "0xuser",
+        "whisperTimestamp": 1700000000000,
+        "messageType": 1,
+        "contentType": 7,
+        "text": "a caption",
+        "responseTo": "",
+        "image": ["http://localhost:9000/messageId=abc"],
+        "albumId": "",
+        "albumImagesCount": 0,
+    }
+    message = Message.from_raw(raw)
+
     db = Database("sqlite", host="", port=0, user="", password="", name=":memory:")
     db.create_tables()
     module = _receiver_module(db)
 
-    module._process_and_insert(
-        [_message_payload()],
-        ReceivedMessage,
-        receiver._MESSAGE_DETERMINISTIC_COLUMNS,
-        receiver._MESSAGE_DROP_COLUMNS,
-    )
-    module._process_and_insert(
-        [_message_payload()],
-        ReceivedMessage,
-        receiver._MESSAGE_DETERMINISTIC_COLUMNS,
-        receiver._MESSAGE_DROP_COLUMNS,
-    )
+    module.on_event(message)
 
-    with db.session() as session:
-        messages = session.execute(select(ReceivedMessage)).scalars().all()
-
-    assert len(messages) == 1
+    stored = _stored_messages(db)
+    assert len(stored) == 1
+    row = stored[0]
+    assert row.content_type == types.Content.IMAGE.value
+    assert row.message_type == "PRIVATE"
+    assert row.response_to is None
+    decrypted = from_encrypted_value(row.text, KEY)
+    assert "a caption" in decrypted
+    assert "http://localhost:9000/messageId=abc" in decrypted
+    assert row.whisper_timestamp == datetime.datetime.fromtimestamp(1700000000)

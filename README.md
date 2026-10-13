@@ -4,6 +4,7 @@
 
 This repository allow to run a Bot for the [Status App](https://status.app). The bot can be used for multiple reason:
 - [Interracting with Status Chats](./docs/usage/messaging.md)
+- [Engaging with users](./docs/usage/engagement.md)
 - [Monitoring Community](./docs/usage/monitoring.md)
 
 
@@ -23,7 +24,7 @@ You can run it with:
 ```bash
 docker-compose up -d --build
 ```
-it will require a `.env` file for secrets and `config.yaml`. The configuration is detailed in [the documentation](./docs/usage//configuration.md).
+it will require a `.env` file for secrets and `config.yaml`. The configuration is detailed in [the documentation](./docs/deployment/configuration.md).
 
 
 ### Tests
@@ -38,9 +39,9 @@ pytest tests/
 
 If you have already created a Status account and want to use it with it's current data, please make sure you export the `.bkp` file and put it in folder **backups** and have the following `.env` variables:
 
-- `BOT_DISPLAY_NAME`
-- `BOT_PASSWORD`
-- `BOT_MNEMONIC_PHRASE`
+- `BOT__NAME`
+- `BOT__PASSWORD`
+- `BOT__MNEMONIC_PHRASE`
 
 
 

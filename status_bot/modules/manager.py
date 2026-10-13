@@ -8,7 +8,6 @@ from prometheus_client import Counter
 
 from .base import BaseModule, ModuleConfig, ModuleContext, ModuleType
 from status_bot.config import ModulesConfig
-from status_bot.constants import EventTypeEnum
 from status_bot import Database
 from status_sdk import Account
 
@@ -239,14 +238,13 @@ class ModuleManager:
             self._stop_event.wait(interval)
 
     def _run_event_listener(self) -> None:
-        for event in self._account.signal.listen([EventTypeEnum.MESSAGE.value]):
-            event_type = event.get("type")
-            logger.info(f"Received a {event_type}")
+        for message in self._account.listen_events():
+            logger.debug(f"New message {message.id}, {message.content}")
             if self._stop_event.is_set():
                 break
             try:
                 for module in self._event_modules.values():
-                    module.run_event(event_type, event)
+                    module.run_event(message)
             except Exception as e:
                 logger.error(
                     f"Error in event listener: {e}",

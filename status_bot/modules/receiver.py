@@ -1,62 +1,77 @@
 import datetime
 import logging
+from enum import Enum
 
-from sqlalchemy import DateTime
 from sqlalchemy.exc import IntegrityError
 
-from status_bot.constants import (
-    _CHAT_DETERMINISTIC_COLUMNS,
-    _MESSAGE_DETERMINISTIC_COLUMNS,
-    _MESSAGE_DROP_COLUMNS,
-)
-from status_bot.models import ReceivedChat, ReceivedMessage
+from status_bot.constants import _MESSAGE_ENCRYPTED_COLUMNS
+from status_bot.models import ReceivedMessage
 from status_bot.modules.base import BaseModule, ModuleType
-from status_bot.modules.utils import camel_to_snake, to_hmac_sha256_hash
+from status_bot.modules.utils import derive_encryption_key, to_encrypted_value
+
+from status_sdk.models import Message
 
 logger = logging.getLogger(__name__)
 
-TIMESTAMP_DIVISOR = 1_000
+# Column name -> ORM attribute name ("from" is stored in the `from_` attribute)
+_COLUMN_TO_ATTRIBUTE = {
+    attribute.expression.name: attribute.key
+    for attribute in ReceivedMessage.__mapper__.column_attrs
+}
 
 
-def build_model_rows(
-    raw_data: list[dict],
-    model,
-    deterministic_columns: list[str],
-    drop_columns: list[str],
-    pepper: str = "",
-) -> list:
-    timestamp_columns = {
-        column.name for column in model.__table__.columns if isinstance(column.type, DateTime)
+def _encrypt(value, key: bytes):
+    """
+    Encrypt a column value, keeping `None` as `NULL`.
+    """
+    if value is None:
+        return None
+    return to_encrypted_value(str(value), key)
+
+
+def _enum_value(value):
+    """
+    Unwrap an enum to its raw value, leave anything else untouched.
+    """
+    return value.value if isinstance(value, Enum) else value
+
+
+def _enum_name(value):
+    """
+    Use the enum member name (e.g. "PRIVATE"), leave anything else as string.
+    """
+    if value is None:
+        return None
+    return value.name if isinstance(value, Enum) else str(value)
+
+
+def build_message_row(message: Message, key: bytes) -> ReceivedMessage:
+    """
+    Convert a `status_sdk` Message into a `ReceivedMessage` row.
+
+    Identifying and content-bearing columns (see `_MESSAGE_ENCRYPTED_COLUMNS`)
+    are encrypted with AES-SIV, so the same value always maps to the same
+    ciphertext and primary-key dedup keeps working. No human-readable user
+    data is stored at rest.
+    """
+    encrypted_columns = {
+        "id": message.id,
+        "from": message.from_public_key,
+        "response_to": message.reply_id,
+        "chat_id": message.chat_id,
+        "text": message.content,
     }
-    column_to_attribute = {
-        attribute.expression.name: attribute.key for attribute in model.__mapper__.column_attrs
-    }
-
-    rows = []
-    for record in raw_data:
-        kwargs = {}
-        for key, value in record.items():
-            name = camel_to_snake(key)
-            if name in drop_columns:
-                continue
-            if name not in column_to_attribute:
-                continue
-            if isinstance(value, (dict, list)):
-                continue
-            if value is None:
-                kwargs[column_to_attribute[name]] = None
-                continue
-            if name in deterministic_columns:
-                kwargs[column_to_attribute[name]] = to_hmac_sha256_hash(str(value), pepper)
-            elif name in timestamp_columns and isinstance(value, (int, float)):
-                kwargs[column_to_attribute[name]] = datetime.datetime.fromtimestamp(
-                    value / TIMESTAMP_DIVISOR
-                )
-            else:
-                kwargs[column_to_attribute[name]] = value
-        rows.append(model(**kwargs))
-
-    return rows
+    content_type = _enum_value(message.content_type)
+    return ReceivedMessage(
+        whisper_timestamp=message.timestamp,
+        content_type=int(content_type) if content_type is not None else None,
+        message_type=_enum_name(message.chat_type),
+        received_timestamp=datetime.datetime.now(),
+        **{
+            _COLUMN_TO_ATTRIBUTE[column]: _encrypt(encrypted_columns[column], key)
+            for column in _MESSAGE_ENCRYPTED_COLUMNS
+        },
+    )
 
 
 class ReceiverModule(BaseModule):
@@ -65,71 +80,34 @@ class ReceiverModule(BaseModule):
         return {ModuleType.EVENT}
 
     def on_start(self):
-        config = self.ctx.shared_state.get("config")
-        self._pepper = config.bot.bot_hash_pepper if config else ""
-
         if self.ctx.db is None:
             logger.warning("Receiver: no database configured, disabling")
             self._disabled = True
             return
 
+        config = self.ctx.shared_state.get("config")
+        secret = config.bot.encryption_key if config else ""
+        self._encryption_key = derive_encryption_key(secret)
         self._disabled = False
 
     def execute(self):
         pass
 
-    def on_event(self, event_type: str, event: dict):
-        event_data = event.get("event", {})
-
-        messages = event_data.get("messages", [])
-        if messages:
-            logger.info(f"Received {len(messages)} message(s)")
-            self._process_and_insert(
-                messages,
-                ReceivedMessage,
-                _MESSAGE_DETERMINISTIC_COLUMNS,
-                _MESSAGE_DROP_COLUMNS,
-            )
-
-        chats = event_data.get("chats", [])
-        if chats:
-            logger.info(f"Received {len(chats)} chat(s)")
-            self._process_and_insert(
-                chats,
-                ReceivedChat,
-                _CHAT_DETERMINISTIC_COLUMNS,
-                [],
-            )
-
-    def _process_and_insert(
-        self,
-        raw_data: list[dict],
-        model,
-        deterministic_columns: list[str],
-        drop_columns: list[str],
-    ):
-        if not raw_data:
+    def on_event(self, message: Message):
+        if self._disabled:
             return
 
-        rows = build_model_rows(
-            raw_data,
-            model,
-            deterministic_columns,
-            drop_columns,
-            self._pepper,
-        )
-        if not rows:
-            return
+        logger.info(f"Received new message (content_type={message.content_type})")
+        row = build_message_row(message, self._encryption_key)
+        self._process_and_insert(row)
 
-        received_at = datetime.datetime.now()
-        for row in rows:
-            row.received_timestamp = received_at
-
+    def _process_and_insert(self, row: ReceivedMessage):
         with self.ctx.db.session() as session:
             try:
-                session.add_all(rows)
+                session.add(row)
                 session.commit()
             except IntegrityError:
                 session.rollback()
-                logger.warning(f"Receiver: duplicate rows skipped in {model.__tablename__}")
-        logger.info(f"Receiver: stored {len(rows)} record(s) in {model.__tablename__}")
+                logger.warning(f"Receiver: duplicate row skipped in {row.__tablename__}")
+                return
+        logger.info(f"Receiver: stored 1 record in {row.__tablename__}")

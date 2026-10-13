@@ -3,6 +3,7 @@ from status_bot.modules import utils
 from status_bot.models import RawMessage, RawCommunityInfo
 from typing import Union
 from status_sdk import Community
+from status_sdk.models import Message
 import pandas as pd
 import datetime
 import sqlalchemy
@@ -82,8 +83,6 @@ class CommunitiesMonitoring(BaseModule):
                     RawCommunityInfo.__table__,
                 ],
             )
-
-        super().on_start()
 
     def execute(self):
         community_names = self.settings.get("communities", [])
@@ -210,7 +209,7 @@ class CommunitiesMonitoring(BaseModule):
 
         return final.copy()
 
-    def on_event(self, event_type: str, event: dict):
+    def on_event(self, message: Message):
         pass
 
     def register_metrics(self) -> None:

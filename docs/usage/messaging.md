@@ -39,6 +39,31 @@ Response `200`:
 {"status": "healthy"}
 ```
 
+### `GET /api/v1/contacts`
+
+List all contacts of the bot account.
+
+```bash
+curl http://localhost:8081/api/v1/contacts
+```
+
+Response `200` — object keyed by public key:
+
+```json
+{
+  "0x...": {
+    "public_key": "0x...",
+    "display_name": "Alice",
+    "contact_state": "mutual",
+    "mutual": true,
+    "chat_id": "0x...",
+    "compressed_key": "zQ3...",
+    "bio": "...",
+    "last_updated": "2026-10-13 10:00:00"
+  }
+}
+```
+
 ### `POST /api/v1/contacts`
 
 Add a contact (send friend request).
@@ -154,10 +179,12 @@ curl http://localhost:8081/api/v1/communities
 
 ### `POST /api/v1/communities/request`
 
+Send a request to join a community.
+
 ```bash
 curl -X POST http://localhost:8081/api/v1/communities/request \
   -H "Content-Type: application/json" \
-  -d '{"text": "Hello from the bot!"}'
+  -d '{"url": "https://status.app/c/..."}'
 ```
 
 Request body:
@@ -169,10 +196,12 @@ Request body:
 Response `201`:
 ```json
 {
-    "status": "request_send"
-    "request_time": time of the request
+    "status": "request send",
+    "request_time": "2026-10-13T10:00:00"
 }
 ```
+
+Error `400` — the request could not be sent.
 
 ## Error handling
 

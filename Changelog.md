@@ -16,25 +16,24 @@
     * New `on_start()` lifecycle hook that calls `start()` and `_verify_mandatory_config()`
     * `_verify_mandatory_config()` uses the `_mandatory_properties` property
 * Metrics added to `community_monitoring`, `manager`, and `messaging` modules
-* Applied `ruff` formatting across the codebase
 * New exception types in `status_bot/exceptions.py`
-* Documentation updated (`docs/deployment/metrics.md`, `docs/development/modules.md`)
+* `receiver` Module - Messages are encrypted (AES-256-SIV) instead of HMAC-SHA256 hashed; new `bot.encryption_key` config field (redacted from logs); the module no longer persists chats (events only carry messages)
+* Removed dead code: `to_hmac_sha256_hash()` and the `bot.bot_hash_pepper` config field (unused since stored messages moved to encryption), the `namespace()` / `model_by_table()` helpers in `status_bot/models/base.py`, and the `ReceivedChat` model (the `received_chats` table is no longer created)
 
 ## Bug fix
 
-* Fixed `run_event` in module manager
 * Fixed SQLAlchemy version pinning
 * Fixed hardcoded version in `status_bot_version` metric (now dynamically reads from `pyproject.toml` via `importlib.metadata`)
 
-## Documentation
+## Upgrade notes
 
-* Fixed missing metrics in `docs/deployment/metrics.md` (execution time histograms, community monitoring, engagement metrics)
-* Fixed `BaseModule` API docs in `docs/development/modules.md` (missing base class, wrong `on_event` signature, typo in `_mandatory_properties`)
-* Fixed missing bot config fields in `docs/deployment/configuration.md` (`chat_key`, `bio`, `profil_picture_path`, `alchemy_token`)
-* Fixed wrong module name in `docs/usage/monitoring.md` (`communities_monitoring` → `community_monitoring`)
-* Fixed database `schema` → `schema_name` in configuration example
-* Fixed bot config example in `docs/index.md`
+* **Purge legacy message rows.** Rows written by previous versions are HMAC-SHA256 digests and can never be decrypted. Before restarting with this version, run:
 
-## Tests
+  ```sql
+  DELETE FROM received_messages;
+  -- the ReceivedChat model was removed; drop the orphaned table
+  DROP TABLE IF EXISTS received_chats;
+  ```
 
-* Added `tests/test_api_metrics.py` for API metrics coverage
+* Set `bot.encryption_key` (or `BOT__ENCRYPTION_KEY`) to a large random value. It must stay stable across restarts — changing it makes previously stored rows unreadable. If unset, the bot logs a warning and derives the key from an empty secret (stored messages are then only obfuscated).
+* `bot.bot_hash_pepper` / `to_hmac_sha256_hash()` were removed. Configs still setting `bot_hash_pepper` keep loading fine (the field is ignored).

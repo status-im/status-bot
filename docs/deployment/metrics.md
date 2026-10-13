@@ -28,7 +28,7 @@ Configured via the `metrics` section in `config.yaml` (see [Configuration](./con
 
 | Type | Labels | Description |
 |------|--------|-------------|
-| Gauge | `version` | Constant `1` with the bot version as a label value |
+| Gauge | `version`, `name` | Constant `1` with the bot version and account name as label values |
 
 ### `status_bot_module_loaded`
 

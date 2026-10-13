@@ -3,6 +3,7 @@ from typing import Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 from status_sdk import Account
+from status_sdk.models import Message
 from status_bot import Database
 from status_bot.exceptions import MandatoryModuleParameterMissingException
 import threading
@@ -14,10 +15,6 @@ class ModuleType(Enum):
     PERIODIC = "periodic"
     EVENT = "event"
     SERVICE = "service"
-
-
-def _module_type_to_set(module_type: ModuleType) -> set[ModuleType]:
-    return {module_type}
 
 
 @dataclass
@@ -99,9 +96,9 @@ class BaseModule(ABC):
         with MODULE_PERIODIC_EXECUTION_TIME.labels(module=self.name).time():
             return self.execute()
 
-    def run_event(self, event_type: str, event: dict):
+    def run_event(self, event: Message):
         with MODULE_EVENT_EXECUTION_TIME.labels(module=self.name).time():
-            return self.on_event(event_type, event)
+            return self.on_event(event)
 
     @abstractmethod
     def execute(self) -> Any: ...
@@ -118,7 +115,7 @@ class BaseModule(ABC):
         pass
 
     @abstractmethod
-    def on_event(self, event_type: str, event: dict) -> None: ...
+    def on_event(self, message: Message) -> None: ...
 
     def register_metrics(self) -> None:
         """Override in subclasses to register custom Prometheus metrics.
@@ -141,7 +138,3 @@ class BaseModule(ABC):
             raise MandatoryModuleParameterMissingException(
                 msg="Missing fields in the config module", missing_fields=missing_fields
             )
-
-    @property
-    def is_running(self) -> bool:
-        return self._running
