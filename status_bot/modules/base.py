@@ -17,10 +17,6 @@ class ModuleType(Enum):
     SERVICE = "service"
 
 
-def _module_type_to_set(module_type: ModuleType) -> set[ModuleType]:
-    return {module_type}
-
-
 @dataclass
 class ModuleConfig:
     name: str
@@ -142,7 +138,3 @@ class BaseModule(ABC):
             raise MandatoryModuleParameterMissingException(
                 msg="Missing fields in the config module", missing_fields=missing_fields
             )
-
-    @property
-    def is_running(self) -> bool:
-        return self._running

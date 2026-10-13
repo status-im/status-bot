@@ -1,15 +1,12 @@
 import logging
 
-from typing import Any, Optional
+from typing import Optional
 
-from sqlalchemy import create_engine, text, Row, inspect
-from sqlalchemy.exc import IntegrityError, NoSuchTableError
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.dialects.postgresql import JSONB
-from .models import Base
 
-import pandas as pd
+from .models import Base
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +36,6 @@ class Database:
             return f"sqlite:///{name}"
         raise ValueError(f"Unsupported database type: {db_type}")
 
-    @property
-    def engine(self) -> Engine:
-        return self._engine
-
     def session(self, schema_name: Optional[str] = None) -> Session:
         return self._session_factory(bind=self.__bind(schema_name))
 
@@ -56,62 +49,3 @@ class Database:
                 schema_translate_map={None: schema_name}
             )
         return self._binds[schema_name]
-
-    def execute(self, query: str):
-        with self._engine.begin() as conn:
-            conn.execute(text(query))
-
-    def fetch_all(self, query: str, params: Optional[dict[str, Any]] = None) -> list[Row]:
-        with self._engine.connect() as conn:
-            return conn.execute(text(query), params or {}).fetchall()
-
-    def close(self):
-        self._engine.dispose()
-
-    def insert(
-        self,
-        data: pd.DataFrame,
-        table_name: str,
-        schema_name: str,
-        json_columns: Optional[list] = None,
-    ):
-        if len(data) == 0:
-            return
-
-        if self._type == "postgres":
-            with self._engine.begin() as conn:
-                conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
-
-        data.columns = [column.lower() for column in data.columns]
-
-        params = {
-            "name": table_name,
-            "con": self._engine,
-            "schema": schema_name,
-            "if_exists": "append",
-            "index": False,
-        }
-        if json_columns and self._type == "postgres":
-            params["dtype"] = {col: JSONB for col in json_columns}
-
-        existing_columns = self.get_columns(table_name, schema_name)
-        if existing_columns:
-            for column in data.columns:
-                if column not in existing_columns:
-                    with self._engine.begin() as conn:
-                        conn.execute(
-                            text(f"ALTER TABLE {schema_name}.{table_name} ADD COLUMN {column} TEXT")
-                        )
-
-        try:
-            data.to_sql(**params)
-        except IntegrityError:
-            logger.warning(f"Duplicate rows skipped in {table_name}")
-
-    def get_columns(self, table_name: str, schema_name: str) -> list[str]:
-        insp = inspect(self._engine)
-        try:
-            columns = insp.get_columns(table_name, schema=schema_name)
-        except NoSuchTableError:
-            return []
-        return [col["name"] for col in columns]

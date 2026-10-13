@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from prometheus_client import REGISTRY, CollectorRegistry, Counter, Histogram
 
 from status_bot.modules.base import BaseModule, ModuleType
+from status_sdk.models import Message
 
 logger = logging.getLogger(__name__)
 
@@ -142,5 +143,5 @@ class APIServerModule(BaseModule):
         if self._server:
             self._server.should_exit = True
 
-    def on_event(self, event_type: str, event: dict) -> None:
+    def on_event(self, message: Message) -> None:
         pass

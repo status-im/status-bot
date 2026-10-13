@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from status_sdk.exceptions import MessageTooLongError, SendContentError
 
 from status_bot.modules.base import BaseModule, ModuleType
+from status_sdk.models import Message
 
 
 class AddContactRequest(BaseModel):
@@ -197,5 +198,5 @@ class MessagingModule(BaseModule):
     def execute(self):
         pass
 
-    def on_event(self, event_type: str, event: dict) -> None:
+    def on_event(self, message: Message) -> None:
         pass
