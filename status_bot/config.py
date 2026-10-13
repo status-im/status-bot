@@ -26,7 +26,6 @@ class BotConfig(BaseModel):
     infura_token: Optional[str] = None
     alchemy_token: Optional[str] = None
     coingecko_api_key: Optional[str] = ""
-    bot_hash_pepper: str = ""
     encryption_key: str = ""
 
 

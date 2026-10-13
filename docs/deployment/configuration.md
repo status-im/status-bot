@@ -38,7 +38,7 @@ logging:
     uvicorn_access: false
 ```
 
-> **Security**: secret values (`bot.password`, `bot.mnemonic_phrase`, `bot.infura_token`, `bot.coingecko_api_key`, `bot.bot_hash_pepper`, `bot.encryption_key`, `api.api_key`, `database.password`) are masked as `[REDACTED]` in any log line, wherever they appear.
+> **Security**: secret values (`bot.password`, `bot.mnemonic_phrase`, `bot.infura_token`, `bot.coingecko_api_key`, `bot.encryption_key`, `api.api_key`, `database.password`) are masked as `[REDACTED]` in any log line, wherever they appear.
 
 ---
 
@@ -57,7 +57,6 @@ logging:
 | `infura_token` | `str` | `null` | `BOT__INFURA_TOKEN` | [Infura token](https://www.infura.io/) required for token-gated communities |
 | `alchemy_token` | `str` | `null` | `BOT__ALCHEMY_TOKEN` | [Alchemy token](https://www.alchemy.com/) for EVM access |
 | `coingecko_api_key` | `str` | `""` | `BOT__COINGECKO_API_KEY` | [CoinGecko API key](https://www.coingecko.com/) required for token-gated communities |
-| `bot_hash_pepper` | `str` | `""` | `BOT__BOT_HASH_PEPPER` | Legacy secret for `utils.to_hmac_sha256_hash`. No built-in module uses it anymore — stored messages are encrypted with `encryption_key` (see [Privacy & storage](#privacy--storage)) |
 | `encryption_key` | `str` | `""` | `BOT__ENCRYPTION_KEY` | Secret used to encrypt stored messages (AES-256-SIV, see [Privacy & storage](#privacy--storage)) |
 
 
@@ -72,7 +71,6 @@ bot:
     infura_token: 'your-infura-token'
     alchemy_token: 'your-alchemy-token'
     coingecko_api_key: 'your-coingecko-key'
-    bot_hash_pepper: 'your-secret-pepper'
     encryption_key: 'your-secret-encryption-key'
 ```
 
@@ -174,8 +172,8 @@ Event payloads are kept in plaintext in-memory so they can be handled correctly;
 
 ```sql
 DELETE FROM received_messages;  -- legacy rows are not decryptable
--- optional, the receiver no longer writes chats:
-DELETE FROM received_chats;
+-- the ReceivedChat model was removed; drop the orphaned table:
+DROP TABLE IF EXISTS received_chats;
 ```
 
 Rows that were not purged can be spotted with `SELECT ... WHERE id NOT LIKE 'enc1$%'`.

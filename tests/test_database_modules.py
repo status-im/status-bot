@@ -3,16 +3,16 @@ import datetime
 import sqlalchemy as sa
 from sqlalchemy import Column, DateTime, Integer, String, select
 
-from status_bot import Base, namespace
+from status_bot import Base
 from status_bot.database import Database
-from status_bot.models import model_by_table
 from status_bot.modules.base import ModuleConfig, ModuleContext
 from status_bot.modules.engagement import Engagement
 
 
-@namespace("mymodule")
+# A model defined by a module at import time: registered on the shared Base,
+# so the single create_tables() pass covers it.
 class Visit(Base):
-    __tablename__ = "visit"
+    __tablename__ = "mymodule_visit"
     id = Column(Integer, primary_key=True, autoincrement=True)
     chat_id = Column(String, nullable=False)
     visitor = Column(String, nullable=True)
@@ -24,7 +24,7 @@ def _database() -> Database:
     return db
 
 
-def test_namespaced_model_registered_after_database_creation_is_picked_up():
+def test_module_model_registered_after_database_creation_is_picked_up():
     db = _database()
 
     db.create_tables()
@@ -33,10 +33,9 @@ def test_namespaced_model_registered_after_database_creation_is_picked_up():
         created = sa.inspect(session.connection()).get_table_names()
 
     assert "mymodule_visit" in created
-    assert "visit" not in created
 
 
-def test_orm_round_trip_for_namespaced_model():
+def test_orm_round_trip_for_module_model():
     db = _database()
     db.create_tables()
 
@@ -55,13 +54,6 @@ def test_orm_round_trip_for_namespaced_model():
     assert visits[0].chat_id == "chat-1"
     assert visits[0].visitor == "alice"
     assert visits[0].seen_at == datetime.datetime(2024, 1, 1, 12, 0, 0)
-
-
-def test_model_by_table_resolves_namespaced_and_late_registered():
-    assert model_by_table("mymodule_visit") is Visit
-    assert model_by_table("received_messages") is not None
-    assert model_by_table("visit") is None
-    assert model_by_table("unknown_table") is None
 
 
 def test_engagement_without_database_does_not_raise():
