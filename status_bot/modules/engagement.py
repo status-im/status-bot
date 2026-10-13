@@ -8,12 +8,12 @@ from prometheus_client import Counter
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from status_bot.constants import EventTypeEnum
 from status_bot.models import FeedbackMessage, ContactRequest
 from status_bot.modules.base import BaseModule, ModuleType
 from status_bot.modules.utils import download_image, is_group_chat_message
 from status_sdk import GroupChat
-from status_sdk.models import Message, MessageContentTypeEnum
+from status_sdk.models import Message
+from status_sdk.types import Content
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,7 @@ class Engagement(BaseModule):
             id=message.id,
             public_key=message.from_public_key,
             request_timestamp=message.timestamp,
-            is_new_user=message.text == self.settings.get("new_user_message_contact_request", ""),
+            is_new_user=message.content == self.settings.get("new_user_message_contact_request", ""),
         )
         self._counter.labels(type="received_request").inc()
         self.account.add_contact(public_key=new_contact.public_key, request_id=message.id)
@@ -169,9 +169,9 @@ class Engagement(BaseModule):
         Output:
             - Flag to process or not
         """
-        if message.compressed_key == self.account.info["compressed_key"]:
+        if message.from_public_key == self.account.info["compressed_key"]:
             return False
-        if message.message_type in IGNORED_MSG_CONTENT_TYPE:
+        if message.content_type in IGNORED_MSG_CONTENT_TYPE:
             return False
         return True
 
@@ -182,7 +182,7 @@ class Engagement(BaseModule):
         and sahre the same text.
         """
         feedback_keywords = self.settings.get("feedback_keywords", [])
-        return any(kw in message.text.lower() for kw in feedback_keywords)
+        return any(kw in message.content.lower() for kw in feedback_keywords)
 
     def send_message(
         self, chat_id: str, original_message: Message, reply_id: Optional[str]
@@ -198,16 +198,16 @@ class Engagement(BaseModule):
         Ouput:
             - message id
         """
-        logger.info(f"Original received : {original_message.content_type} - {original_message.images_url}")
+        logger.info(f"Original received : {original_message.content_type} - {original_message.image_urls}")
         send_msg_id = None
-        if len(original_message.images_url) == 0:
+        if len(original_message.image_urls) == 0:
             send_msg_id = self.account.send_message(
-                chat_id=chat_id, message=original_message.text, reply_to_message_id=reply_id
+                chat_id=chat_id, message=original_message.content, reply_to_message_id=reply_id
             )
             return send_msg_id
-        message_to_send = original_message.text
+        message_to_send = original_message.content
         images_path = []
-        for path in original_message.images_url:
+        for path in original_message.image_urls:
             image_id = path.split("messageId=", 1)[1]
             image_path = f"{self.settings.get('image_folder')}/{image_id}"
             logger.info(f"Path Inaital {path} - path to send {image_path}")
@@ -225,7 +225,7 @@ class Engagement(BaseModule):
                 message_to_send=f"{message_to_send} {REPLY_MSG_ERROR_IMG}"
         send_msg_id = self.account.send_image(
           chat_id=chat_id,
-          image_paths=images_path,
+          file_paths=images_path,
           message=message_to_send,
           reply_to_message_id=reply_id,
         )
@@ -280,16 +280,16 @@ class Engagement(BaseModule):
     """
 
     def find_reply(self, message: Message, db_session: Session):
-        if message.response_to is None:
+        if message.reply_id is None:
             logger.debug("The message isn't a reply, ignoring it")
             return
         original_message: FeedbackMessage = (
             db_session.query(FeedbackMessage)
-            .filter(FeedbackMessage.group_chat_message_id == message.response_to)
+            .filter(FeedbackMessage.group_chat_message_id == message.reply_id)
             .first()
         )
         if original_message is None:
-            logger.warning(f"No original message found for id {message.response_to}")
+            logger.warning(f"No original message found for id {message.reply_id}")
             self._counter.labels(type="original-not-found").inc()
             return
         logger.debug(f"Sending reply to message {original_message.id}")
@@ -299,7 +299,7 @@ class Engagement(BaseModule):
           reply_id=original_message.id
         )
         self._counter.labels(type="sent-reply").inc()
-        original_message.response_message = message.text
+        original_message.response_message = message.content
         original_message.response_timestamp = message.timestamp
         original_message.reply_chat_id = reply_id
         db_session.merge(original_message)
@@ -311,11 +311,11 @@ class Engagement(BaseModule):
                 logger.warning("Message not matching the condition to be proecessed")
                 return
 
-            if message.message_type == MessageContentTypeEnum.CONTACT_REQUEST.value:
+            if message.content_type == Content.CONTACT_REQUEST.value:
                 self.handle_contact_request(message, db_session)
                 return
 
-            if message.message_type == MessageContentTypeEnum.SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED.value:
+            if message.content_type == Content.REMOVED_CONTACT.value:
                 self.remove_contact(message, db_session)
                 return
 

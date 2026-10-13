@@ -13,6 +13,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
 from status_bot.exceptions import ImageDownloadFailedException
+from status_sdk.types import Chat
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +102,7 @@ def is_group_chat_message(message, chat_id: Optional[str] = None) -> bool:
     Output:
         - boolean indiciating if the message is from a ChatGroup and if it has the same chat_id
     """
-    if message.chat_type != "group":
+    if message.chat_type != Chat.GROUP:
         return False
     if not chat_id:
         return True
