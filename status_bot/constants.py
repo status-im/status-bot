@@ -1,4 +1,3 @@
-from enum import Enum
 from importlib.metadata import version as _get_version, PackageNotFoundError
 from pathlib import Path
 import re
@@ -28,16 +27,3 @@ _MESSAGE_ENCRYPTED_COLUMNS = [
     "chat_id",
     "text",
 ]
-
-
-class EventTypeEnum(Enum):
-    MESSAGE = "messages.new"
-    LOCAL_NOTIFICATION = "local-notifications"
-
-
-class NotificationCategoryEnum(Enum):
-    CONTACT_REQUEST = "contactRequest"
-    NEW_MESSAGE = "newMessage"
-    GROUP_INVITE = "groupInvite"
-    COMMUNITY_REQUEST_TO_JOIN = "communityRequestToJoin"
-    COMMUNITY_JOINED = "communityJoined"

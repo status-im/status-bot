@@ -40,7 +40,6 @@ class DatabaseConfig(BaseModel):
     password: str = ""
     name: str = ""
     schema_name: str = "public"
-    tables: dict = {}
 
 
 class ApiConfig(BaseModel):
@@ -56,10 +55,6 @@ class MetricsConfig(BaseModel):
     port: int = 8000
 
 
-class FilesConfig(BaseModel):
-    current_state: str = "dates.pkl"
-
-
 class ModulesConfig(BaseModel):
     directories: list[str] = ["./modules", "bot/modules"]
     enabled: list[str] = []
@@ -70,7 +65,6 @@ class Config(BaseSettings):
     model_config = SettingsConfigDict(env_nested_delimiter="__", extra="ignore", env_file=".env")
 
     logging: LoggingConfig = LoggingConfig()
-    files: FilesConfig = FilesConfig()
     bot: BotConfig = BotConfig()
     backend: BackendConfig = BackendConfig()
     api: ApiConfig = ApiConfig()

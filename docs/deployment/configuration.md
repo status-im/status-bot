@@ -43,19 +43,6 @@ logging:
 
 ## Reference
 
-### `files`
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `current_state` | `str` | `"dates.pkl"` | File path for tracking latest message timestamps per chat |
-
-```yaml
-files:
-    current_state: "dates.pkl"
-```
-
----
-
 ### `bot`
 
 | Field | Type | Default | Env var | Description |
@@ -139,8 +126,7 @@ Supports **Postgres** and **SQLite** (SQLite via `type: sqlite`, where `name` is
 | `user` | `str` | `""` | `DATABASE__USER` | Database username (Postgres) |
 | `password` | `str` | `""` | `DATABASE__PASSWORD` | Database password (Postgres) |
 | `name` | `str` | `""` | `DATABASE__NAME` | Database name (Postgres) or file path (SQLite) |
-| `schema_name` | `str` | `"public"` | `DATABASE__SCHEMA` | Database schema (Postgres) |
-| `tables` | `dict` | `{}` | — | Mapping of data type to table name |
+| `schema_name` | `str` | `"public"` | `DATABASE__SCHEMA_NAME` | Database schema (Postgres) |
 
 Postgres example:
 ```yaml
@@ -152,9 +138,6 @@ database:
     password: 'ChangeMe'
     name: 'status-bot'
     schema_name: "status_app_monitoring"
-    tables:
-        messages: "raw_messages"
-        community: "raw_community_info"
 ```
 
 SQLite example:

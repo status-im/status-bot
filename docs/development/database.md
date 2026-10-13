@@ -14,11 +14,11 @@ The layer makes three deliberate trade-offs:
 
 | Component | Where | Role |
 |---|---|---|
-| `Database` | `status_bot/database.py` | Wraps the engine and session factory. ORM-only surface: `session()`, `create_tables(tables=None)`, `execute(sql)`, `close()`. Supports `postgres` and `sqlite` URL schemes. |
+| `Database` | `status_bot/database.py` | Wraps the engine and session factory. Surface: `session()`, `create_tables(tables=None)`. Supports `postgres` and `sqlite` URL schemes. |
 | `Base` | `status_bot/models/base.py` | SQLAlchemy `DeclarativeBase`. The single registry every model registers on. |
 | `namespace(prefix)` | `status_bot/models/base.py` | Decorator that renames a model's table to `{prefix}_{name}` so module tables can't collide with core tables. Rejects empty prefixes, idempotent. |
 | `model_by_table(name)` | `status_bot/models/base.py` | Scans `Base.registry.mappers` at call time and returns the mapped class for a table name, or `None`. Dynamic, so it sees late-registered and namespaced models. |
-| Core models | `status_bot/models/` | `ReceivedMessage`, `ReceivedChat`, `Community`, `Channel`. |
+| Core models | `status_bot/models/` | `ReceivedMessage`, `ReceivedChat`, `RawCommunityInfo`, `RawMessage`, `ContactRequest`, `FeedbackMessage`. |
 | `ModuleContext.db` | `status_bot/modules/base.py` | How a module receives the shared `Database` instance — or `None` when no database is configured. |
 
 All of `Base`, `namespace`, `model_by_table`, and `Database` are re-exported from the top-level `status_bot` package for a single import point.

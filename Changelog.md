@@ -22,6 +22,7 @@
 * Documentation updated (`docs/deployment/metrics.md`, `docs/development/modules.md`)
 * `receiver` - Messages are encrypted (AES-256-SIV) instead of HMAC-SHA256 hashed; new `bot.encryption_key` config field (redacted from logs); the module no longer persists chats (events only carry messages)
 * `pycryptodome` added as an explicit dependency (used for AES-SIV)
+* Removed dead code: `utils.camel_to_snake()` and `utils.save_file()`, `constants.EventTypeEnum`/`NotificationCategoryEnum`, `BaseModule.is_running` and `_module_type_to_set()`, the unused `Database` methods (`execute`, `fetch_all`, `insert`, `get_columns`, `close`, `engine`), the orphaned `Channel` model, and the unused `files.current_state` / `database.tables` config fields. The `on_event` overrides in `messaging`, `api_server` and `community_monitoring` now match the `BaseModule.on_event(message)` signature
 
 ## Bug fix
 

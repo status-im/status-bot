@@ -3,12 +3,9 @@ import binascii
 import datetime
 import hmac
 import logging
-import os
-import pickle
 import re
 from hashlib import sha256
-import pandas as pd
-from typing import Any, Optional
+from typing import Optional
 import requests
 
 from Crypto.Cipher import AES
@@ -33,12 +30,6 @@ _PBKDF2_ITERATIONS = 200_000
 # Prefix marking a column value as an encrypted blob ("enc1" = format version 1).
 # Legacy values written as plain HMAC-SHA256 hex digests do not carry it.
 ENCRYPTION_PREFIX = "enc1$"
-
-
-def camel_to_snake(name: str) -> str:
-    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
-    s2 = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
-    return s2.lower()
 
 
 def to_sha256_hash(value: str) -> str:
@@ -149,19 +140,6 @@ def from_encrypted_value(value: str, key: bytes) -> str:
 
 def to_midnight(timestamp: datetime.datetime) -> datetime.datetime:
     return timestamp.replace(minute=0, second=0, hour=0, microsecond=0)
-
-
-def save_file(file_path: str, data: Any):
-    folder = os.path.dirname(file_path)
-    if len(folder) > 0:
-        os.makedirs(folder, exist_ok=True)
-
-    if isinstance(data, pd.DataFrame):
-        data.to_csv(file_path, index=False)
-        return
-
-    with open(file_path, "wb") as f:
-        pickle.dump(data, f)
 
 
 def download_image(url: str, image_path: str):

@@ -68,10 +68,6 @@ Module name (from configuration).
 
 Module-specific settings dictionary from `config.yaml`.
 
-#### `is_running`
-
-Boolean indicating whether the module is currently running.
-
 #### `ctx`
 
 Every module receives a `ModuleContext` via the constructor, accessible as `self.ctx`:
@@ -164,7 +160,6 @@ A module can declare `EVENT` alongside other types (e.g., `PERIODIC | EVENT`). I
 | `to_encrypted_value(value, key)` | Encrypts a string with AES-SIV (deterministic, authenticated) and returns it with an `enc1$` prefix |
 | `from_encrypted_value(value, key)` | Decrypts a value produced by `to_encrypted_value`; raises `ValueError` on tampering or a wrong key |
 | `to_midnight(timestamp)` | Truncates a datetime to the start of its day |
-| `save_file(file_path, data)` | Saves a DataFrame as CSV or pickles any other object |
 
 
 ## Message storage & privacy
