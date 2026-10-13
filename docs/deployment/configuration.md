@@ -6,9 +6,10 @@ The bot is configured through a YAML file (`config.yaml`), environment variables
 
 Sources are resolved in priority order (highest first). A value is taken from the first source that defines it; later sources only fill in settings not set by a higher-priority source:
 
-1. `config.yaml` — highest priority; overrides environment variables and the `.env` file
-2. Shell environment variables — override the `.env` file
-3. `.env` file — lowest priority, used as fallback (loaded from the current working directory)
+1. Keyword arguments passed to `Config(...)` — highest priority
+2. Shell environment variables — override the `.env` file and `config.yaml`
+3. `.env` file — overrides `config.yaml` (loaded from the current working directory)
+4. `config.yaml` — lowest priority, provides the base values
 
 ## Usage
 
@@ -56,7 +57,7 @@ logging:
 | `infura_token` | `str` | `null` | `BOT__INFURA_TOKEN` | [Infura token](https://www.infura.io/) required for token-gated communities |
 | `alchemy_token` | `str` | `null` | `BOT__ALCHEMY_TOKEN` | [Alchemy token](https://www.alchemy.com/) for EVM access |
 | `coingecko_api_key` | `str` | `""` | `BOT__COINGECKO_API_KEY` | [CoinGecko API key](https://www.coingecko.com/) required for token-gated communities |
-| `bot_hash_pepper` | `str` | `""` | `BOT__BOT_HASH_PEPPER` | Secret key used for HMAC-SHA256 hashing of stored data (see [Privacy & storage](#privacy--storage)) |
+| `bot_hash_pepper` | `str` | `""` | `BOT__BOT_HASH_PEPPER` | Legacy secret for `utils.to_hmac_sha256_hash`. No built-in module uses it anymore — stored messages are encrypted with `encryption_key` (see [Privacy & storage](#privacy--storage)) |
 | `encryption_key` | `str` | `""` | `BOT__ENCRYPTION_KEY` | Secret used to encrypt stored messages (AES-256-SIV, see [Privacy & storage](#privacy--storage)) |
 
 
