@@ -96,6 +96,8 @@ class ReceiverModule(BaseModule):
     def on_event(self, message: Message):
         if self._disabled:
             return
+        if not isinstance(message, Message):
+            return
 
         logger.info(f"Received new message (content_type={message.content_type})")
         row = build_message_row(message, self._encryption_key)

@@ -1,7 +1,7 @@
 from .base import Base
 from .message import ReceivedMessage
 from .community import RawCommunityInfo, RawMessage
-from .contact_request import ContactRequest
+from .engagement_contact_request import EngagementContactRequest
 from .feedback_message import FeedbackMessage
 
 __all__ = [
@@ -9,6 +9,6 @@ __all__ = [
     "ReceivedMessage",
     "RawCommunityInfo",
     "RawMessage",
-    "ContactRequest",
+    "EngagementContactRequest",
     "FeedbackMessage",
 ]

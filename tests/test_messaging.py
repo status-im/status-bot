@@ -45,9 +45,7 @@ def _make_client(contacts):
 def test_send_message_to_mutual_contact_by_compressed_key():
     client, account = _make_client(CONTACTS)
 
-    response = client.post(
-        "/api/v1/messages/zQAliceCompressedKey", json={"content": "hello there"}
-    )
+    response = client.post("/api/v1/messages/zQAliceCompressedKey", json={"content": "hello there"})
 
     assert response.status_code == 201
     assert response.json() == {"status": "ok"}
@@ -93,9 +91,7 @@ def test_send_message_missing_content():
 def test_send_message_empty_content():
     client, account = _make_client(CONTACTS)
 
-    response = client.post(
-        "/api/v1/messages/zQAliceCompressedKey", json={"content": ""}
-    )
+    response = client.post("/api/v1/messages/zQAliceCompressedKey", json={"content": ""})
 
     assert response.status_code == 400
     account.send_message.assert_not_called()
@@ -125,9 +121,7 @@ def test_send_message_embeds_only():
             "footer": {"text": "monitoring-bot"},
         }
     ]
-    response = client.post(
-        "/api/v1/messages/zQAliceCompressedKey", json={"embeds": embeds}
-    )
+    response = client.post("/api/v1/messages/zQAliceCompressedKey", json={"embeds": embeds})
 
     assert response.status_code == 201
     assert response.json() == {"status": "ok"}
@@ -155,8 +149,6 @@ def test_send_message_backend_error():
     client, account = _make_client(CONTACTS)
     account.send_message.side_effect = SendContentError("boom")
 
-    response = client.post(
-        "/api/v1/messages/zQAliceCompressedKey", json={"content": "hi"}
-    )
+    response = client.post("/api/v1/messages/zQAliceCompressedKey", json={"content": "hi"})
 
     assert response.status_code == 502

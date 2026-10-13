@@ -71,7 +71,7 @@ jobs:
         run: pip install -e . pip-audit
 
       - name: Run pip-audit
-        run: pip-audit
+        run: pip-audit .
 
   misc:
     name: YAML validation

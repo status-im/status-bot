@@ -75,9 +75,7 @@ class MessagingModule(BaseModule):
         @app.get("/api/v1/contacts")
         def get_contacts():
             return {
-                key: contact
-                for key, contact in account.contacts.items()
-                if contact.get("mutual")
+                key: contact for key, contact in account.contacts.items() if contact.get("mutual")
             }
 
         @app.post("/api/v1/contacts", status_code=201)
@@ -177,7 +175,7 @@ class MessagingModule(BaseModule):
             except SendContentError as e:
                 raise HTTPException(status_code=502, detail=str(e))
             except Exception as e:  # backend/unexpected failure
-                raise HTTPException(status_code=502, detail="Failed to send message")
+                raise HTTPException(status_code=502, detail=f"Failed to send message {e}")
             return {"status": "ok"}
 
         @app.get("/api/v1/communities")

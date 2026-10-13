@@ -7,12 +7,11 @@ from prometheus_client import Counter
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from status_bot.models import FeedbackMessage, ContactRequest
+from status_bot.models import FeedbackMessage, EngagementContactRequest
 from status_bot.modules.base import BaseModule, ModuleType
 from status_bot.modules.utils import download_image, is_group_chat_message
 from status_sdk import GroupChat
-from status_sdk.models import Message
-from status_sdk.types import Content
+from status_sdk.models import Message, ContactRequest
 
 logger = logging.getLogger(__name__)
 
@@ -32,12 +31,12 @@ def get_all_contact_to_contact(db_session: Session, delay: int, delay_unit: str)
     logger.debug(f"Threshold {threshold}")
 
     return (
-        db_session.query(ContactRequest)
+        db_session.query(EngagementContactRequest)
         .filter(
             and_(
-                ContactRequest.request_timestamp < threshold,
-                ContactRequest.last_engagement_message < delay,
-                ContactRequest.is_new_user,
+                EngagementContactRequest.request_timestamp < threshold,
+                EngagementContactRequest.last_engagement_message < delay,
+                EngagementContactRequest.is_new_user,
             )
         )
         .all()
@@ -111,20 +110,20 @@ class Engagement(BaseModule):
             )
         logger.info(f"Feedback keyword configured are: {self.settings.get('feedback_keywords')}")
 
-    def handle_contact_request(self, message: Message, db_session: Session):
+    def handle_contact_request(self, message: ContactRequest, db_session: Session):
         """
         Function to handle new contact request.
         It accept all contact request, save the contact in the database
         Send the messages to the user based on `first_messages`.
         Parameters:
-            - message: first message part of the event content transmitted by the Backend
+            - message: ContactRequest Send by the user
             - session: ORM database session
         """
-        new_contact: ContactRequest = ContactRequest(
+        new_contact: EngagementContactRequest = EngagementContactRequest(
             id=message.id,
-            public_key=message.from_public_key,
+            public_key=message.public_key,
             request_timestamp=message.timestamp,
-            is_new_user=message.content == self.settings.get("new_user_message_contact_request"),
+            is_new_user=message.text == self.settings.get("new_user_message_contact_request"),
         )
         self._counter.labels(type="received_request").inc()
         self.account.add_contact(public_key=new_contact.public_key, request_id=message.id)
@@ -138,7 +137,7 @@ class Engagement(BaseModule):
             self.account.send_message(chat_id=new_contact.public_key, message=msg)
         self._counter.labels(type=message_properties).inc()
 
-    def remove_contact(self, message: Message, db_session: Session):
+    def remove_contact(self, message: EngagementContactRequest, db_session: Session):
         """
         Function to handle removal of contact.
         When a user remove the bot as a contact, all data with the user public key
@@ -147,13 +146,13 @@ class Engagement(BaseModule):
             - session: ORM database session
 
         """
-        user_public_key = message.from_public_key
+        user_public_key = message.public_key
         logger.info("Received a Contact Removal")
         db_session.query(FeedbackMessage).filter(
             FeedbackMessage.public_key == user_public_key
         ).delete()
-        db_session.query(ContactRequest).filter(
-            ContactRequest.public_key == user_public_key
+        db_session.query(EngagementContactRequest).filter(
+            EngagementContactRequest.public_key == user_public_key
         ).delete()
         db_session.commit()
         self._counter.labels(type="contact-removed").inc()
@@ -201,10 +200,10 @@ class Engagement(BaseModule):
         send_msg_id = None
         if len(original_message.image_urls) == 0:
             send_msg_id = self.account.send_message(
-                chat_id=chat_id, message=original_message.content, reply_to_message_id=reply_id
+                chat_id=chat_id, message=original_message.text, reply_to_message_id=reply_id
             )
             return send_msg_id
-        message_to_send = original_message.content
+        message_to_send = original_message.text
         images_path = []
         for path in original_message.image_urls:
             image_id = path.split("messageId=", 1)[1]
@@ -306,26 +305,27 @@ class Engagement(BaseModule):
 
     def on_event(self, message: Message):
         with self.ctx.db.session() as db_session:
-            if not self.should_process_messages(message):
-                logger.warning("Message not matching the condition to be proecessed")
-                return
+            if isinstance(message, ContactRequest):
+                if message.removed:
+                    logger.debug("A user has removed the bot as a contact")
+                    self.remove_contact(message, db_session)
+                    return
+                if message.incoming:
+                    logger.debug("A user has added the bot as a contact")
+                    self.handle_contact_request(message, db_session)
+                    return
+                else:
+                    logger.warning("ContactRequest not handled")
 
-            if message.content_type == Content.CONTACT_REQUEST.value:
-                self.handle_contact_request(message, db_session)
-                return
-
-            if message.content_type == Content.REMOVED_CONTACT.value:
-                self.remove_contact(message, db_session)
-                return
-
-            if is_group_chat_message(message, chat_id=self.group_chat.id):
-                self.find_reply(message, db_session)
-                return
-            elif is_group_chat_message(message):
-                logger.debug("Ignoring message from GroupChat outside of official group")
-                return
-            else:
-                self.handle_users_messages(message, db_session)
+            if isinstance(message, Message):
+                if is_group_chat_message(message, chat_id=self.group_chat.id):
+                    self.find_reply(message, db_session)
+                    return
+                elif is_group_chat_message(message):
+                    logger.debug("Ignoring message from GroupChat outside of official group")
+                    return
+                else:
+                    self.handle_users_messages(message, db_session)
 
     def delete_old_messages(self, db_session: Session):
         """

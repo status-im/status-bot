@@ -31,6 +31,7 @@ def _message(**overrides) -> Message:
         "timestamp": datetime.datetime.fromtimestamp(1700000000),
         "chat_type": types.Chat.PRIVATE,
         "source": "status",
+        "raw": {},
     }
     params.update(overrides)
     return Message(**params)

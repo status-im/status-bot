@@ -3,7 +3,7 @@ from sqlalchemy import Column, DateTime, Float, String, Boolean
 from .base import Base
 
 
-class ContactRequest(Base):
+class EngagementContactRequest(Base):
     __tablename__ = "contact_request"
 
     id = Column(String, primary_key=True)
