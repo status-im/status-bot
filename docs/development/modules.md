@@ -16,6 +16,42 @@ Modules can declare one or more types. The behavior is composed from the declare
 - `PERIODIC | EVENT`: Runs `execute()` periodically and receives signal events
 - `EVENT | SERVICE`: Listens to events while running a blocking service
 
+## Module layout
+
+A module is either a **single file** or a **directory**, discovered in the bot package itself and in every directory listed in `modules.directories`:
+
+```
+modules/
+├── my_module.py            # single-file module
+└── my_other_module/        # directory module
+    ├── main.py             # entry point (required)
+    ├── helpers.py          # sibling file, importable from main.py
+    └── models.py
+```
+
+- The module **name** is the file name or directory name (`my_module`, `my_other_module`); it is the identifier used in `enabled`, `settings`, and the module YAML file.
+- Directory modules load `main.py` as the entry point. Sibling files can be imported from `main.py` (and from other sibling files) with **plain imports** (`import helpers`, `from helpers import x`) and with **relative imports** (`from .helpers import x`) — both work.
+- Files and directories starting with `_` are ignored, as are the framework files `base.py`, `manager.py`, and `utils.py`.
+- If both `module-name.py` and `module-name/main.py` exist in the same scanned directory, the **directory version is loaded** and a warning is logged.
+- Sibling files are put on `sys.path`, so a sibling named like a stdlib or `status_bot` module would shadow it — avoid such names.
+
+## Module configuration
+
+Each module's settings come from `self.ctx.config.settings` (see below), which is resolved from up to two YAML sources:
+
+1. `modules.settings.<module-name>` in the main `config.yaml`
+2. `<config_directory>/<module-name>.yaml`, where `config_directory` is set via `modules.config_directory`
+
+The two are **deep-merged**: nested dicts are merged key by key and the module YAML wins on conflicting keys; non-conflicting `config.yaml` keys are kept.
+Environment variables (`MODULES__SETTINGS__<MODULE>__<KEY>`) still have the highest priority. 
+Overall precedence, highest first:
+
+1. env vars
+2. config_directory>/<module-name>.yaml
+3. config.yaml
+
+A malformed module YAML is logged as an error and the module starts with its `config.yaml` settings only.
+
 ## BaseModule API
 
 ```python
@@ -47,7 +83,7 @@ class MyModule(BaseModule):
 
 #### `interval`
 
-Number of minutes to wait between every `ModuleType.PERIODIC` run. This value can be set within the module config `modules.settings.$module_name.interval`.
+Number of minutes to wait between every `ModuleType.PERIODIC` run. This value can be set within the module config `modules.settings.$module_name.interval` or in the module's own YAML file (`<config_directory>/<module_name>.yaml`).
 
 #### `db_schema`
 
@@ -67,7 +103,7 @@ Module name (from configuration).
 
 #### `settings`
 
-Module-specific settings dictionary from `config.yaml`.
+Module-specific settings dictionary, deep-merged from `config.yaml` (`modules.settings.$module_name`) and the module's own YAML file (`<config_directory>/<module_name>.yaml`), the module YAML winning on conflicts — see [Module configuration](#module-configuration).
 
 #### `ctx`
 
@@ -83,7 +119,7 @@ Every module receives a `ModuleContext` via the constructor, accessible as `self
 
 ##### `ModuleConfig`
 
-Each module receives only its own settings from `config.yaml`:
+Each module receives only its own settings (from `config.yaml` and its module YAML file):
 
 ```python
 self.ctx.config.name        # module identifier
