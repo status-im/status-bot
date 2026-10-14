@@ -1,9 +1,12 @@
 import importlib.util
+import sys
 import threading
 import logging
-from typing import Type
+import types
+from typing import Optional, Type
 from pathlib import Path
 
+import yaml
 from prometheus_client import Counter
 
 from .base import BaseModule, ModuleConfig, ModuleContext, ModuleType
@@ -12,6 +15,39 @@ from status_bot import Database
 from status_sdk import Account
 
 logger = logging.getLogger(__name__)
+
+# Framework files inside the modules directories that are never modules.
+SKIP_MODULE_NAMES = ("base", "manager", "utils")
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge ``override`` into a copy of ``base``; override wins on leaves."""
+    result = dict(base)
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def _load_module_yaml(config_directory: Optional[str], module_name: str) -> dict:
+    """Load ``<config_directory>/<module_name>.yaml`` if it exists, else ``{}``.
+
+    Raises ``yaml.YAMLError`` on malformed YAML; a file that is not a mapping
+    (or is empty) is treated as ``{}``.
+    """
+    if not config_directory:
+        return {}
+    path = Path(config_directory) / f"{module_name}.yaml"
+    if not path.is_file():
+        path = Path(config_directory) / f"{module_name}.yml"
+        if not path.is_file():
+            return {}
+    with path.open("r", encoding="utf-8") as file:
+        data = yaml.safe_load(file)
+    logger.info(f"Loading config file {path}")
+    return data if isinstance(data, dict) else {}
 
 
 class ModuleManager:
@@ -63,6 +99,11 @@ class ModuleManager:
                 continue
             self._discover_from_directory(directory)
 
+        config_directory = self._modules_config.config_directory
+        logger.info(f"Looking at config file under {config_directory}")
+        if config_directory and not Path(config_directory).is_dir():
+            logger.warning(f"Module config directory not found: {config_directory}")
+
         logger.info(
             f"Discovered {len(self._module_classes)} module class(es): "
             f"{list(self._module_classes.keys())}"
@@ -74,28 +115,68 @@ class ModuleManager:
             logger.warning(f"Module directory not found: {directory}")
             return
 
-        for file_path in sorted(base_path.glob("*.py")):
-            if file_path.name.startswith("_"):
+        file_modules = {
+            path.stem for path in base_path.glob("*.py") if not path.name.startswith("_")
+        }
+        dir_modules = {
+            path.name
+            for path in base_path.iterdir()
+            if path.is_dir() and not path.name.startswith("_") and (path / "main.py").is_file()
+        }
+
+        for module_name in sorted(file_modules | dir_modules):
+            if module_name in SKIP_MODULE_NAMES:
                 continue
-            self._load_module_from_file(file_path)
 
-    def _load_module_from_file(self, file_path: Path) -> None:
-        module_name = file_path.stem
+            in_file = module_name in file_modules
+            in_dir = module_name in dir_modules
 
-        if module_name in ("base", "manager", "utils"):
-            return
+            if in_file and in_dir:
+                logger.warning(
+                    f"Module '{module_name}' exists both as a file and a directory in "
+                    f"{base_path}; loading the directory version"
+                )
 
+            if in_dir:
+                self._load_module(
+                    module_name,
+                    base_path / module_name / "main.py",
+                    base_path / module_name,
+                )
+            else:
+                self._load_module(module_name, base_path / f"{module_name}.py", None)
+
+    def _load_module(self, module_name: str, entry_point: Path, module_dir: Optional[Path]) -> None:
+        """Load a module from a single file or from ``module_dir/main.py``.
+
+        For directory modules, ``module_dir`` is prepended to ``sys.path`` and a
+        parent package is registered so sibling files can be imported both with
+        plain imports (``import helpers``) and relative imports
+        (``from .helpers import x``).
+        """
+        scan_dir = (
+            entry_point.parent.resolve() if module_dir is None else module_dir.parent.resolve()
+        )
         bot_modules_dir = Path(__file__).parent.resolve()
-        if file_path.parent.resolve() == bot_modules_dir:
+        if scan_dir == bot_modules_dir:
             pkg_name = f"status_bot.modules.{module_name}"
         else:
-            pkg_name = f"modules.{module_name}"
+            pkg_name = f"bot_modules.{module_name}"
 
-        spec = importlib.util.spec_from_file_location(pkg_name, file_path)
+        if module_dir is not None:
+            self._prepare_package_imports(pkg_name, module_dir)
+
+        spec = importlib.util.spec_from_file_location(
+            pkg_name,
+            entry_point,
+            submodule_search_locations=[str(module_dir)] if module_dir is not None else None,
+        )
         if spec is None or spec.loader is None:
+            logger.error(f"Could not create import spec for module '{module_name}' ({entry_point})")
             return
 
         module = importlib.util.module_from_spec(spec)
+        sys.modules[pkg_name] = module
         spec.loader.exec_module(module)
 
         for attr_name in dir(module):
@@ -104,9 +185,47 @@ class ModuleManager:
                 self._module_classes[module_name] = attr
                 logger.debug(f"Found module class: {module_name}.{attr_name}")
 
+    @staticmethod
+    def _prepare_package_imports(pkg_name: str, module_dir: Path) -> None:
+        """Make ``module_dir`` importable via plain and relative imports."""
+        parent_name, _, _ = pkg_name.rpartition(".")
+        if parent_name and parent_name not in sys.modules:
+            parent = types.ModuleType(parent_name)
+            parent.__path__ = []
+            sys.modules[parent_name] = parent
+        module_dir_str = str(module_dir)
+        if module_dir_str not in sys.path:
+            sys.path.insert(0, module_dir_str)
+
+    def _resolve_module_settings(self, module_name: str) -> dict:
+        """Resolve a module's settings.
+
+        Precedence (highest first): environment variables (applied by pydantic
+        before this runs) > ``<config_directory>/<module-name>.yaml`` >
+        ``modules.settings.<module-name>`` in ``config.yaml``. The two YAML
+        sources are deep-merged, the module YAML winning on conflicting keys.
+        """
+        base = self._modules_config.settings.get(module_name, {})
+        if not isinstance(base, dict):
+            base = {}
+
+        try:
+            yaml_settings = _load_module_yaml(self._modules_config.config_directory, module_name)
+        except yaml.YAMLError as e:
+            logger.error(
+                f"Invalid module YAML for '{module_name}' in "
+                f"'{self._modules_config.config_directory}': {e}. "
+                "Falling back to config.yaml settings"
+            )
+            return base
+
+        if not yaml_settings:
+            return base
+        logger.debug(f"Module '{module_name}' settings overlaid from module YAML")
+        return _deep_merge(base, yaml_settings)
+
     def load_modules(self) -> None:
         enabled = set(self._modules_config.enabled)
-        settings = self._modules_config.settings
 
         if not enabled:
             logger.info("No modules enabled in config")
@@ -121,7 +240,7 @@ class ModuleManager:
                 continue
 
             module_class = self._module_classes[module_name]
-            module_settings = settings.get(module_name, {})
+            module_settings = self._resolve_module_settings(module_name)
 
             module_config = ModuleConfig(
                 name=module_name,
