@@ -16,7 +16,7 @@ AUTH_FAILURES = "status_bot_api_auth_failures_total"
 
 class StubAccount:
     def __init__(self):
-        self.contacts = []
+        self.contacts = {}
         self.chats = []
         self.communities = []
 

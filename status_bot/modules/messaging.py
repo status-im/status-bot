@@ -3,6 +3,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from status_sdk.exceptions import MessageTooLongError, SendContentError
 
 from status_bot.modules.base import BaseModule, ModuleType
 
@@ -14,6 +15,40 @@ class AddContactRequest(BaseModel):
 
 class SendMessageRequest(BaseModel):
     text: str
+
+
+class SendMessageToUserRequest(BaseModel):
+    """Discord webhook-inspired payload to send a message to a contact."""
+
+    content: Optional[str] = None
+    embeds: Optional[list[dict]] = None
+
+
+def _render_embeds_to_text(embeds: list[dict]) -> str:
+    """Render a list of Discord-style embeds into plain text for Status App."""
+    parts: list[str] = []
+    for embed in embeds or []:
+        lines: list[str] = []
+        author = embed.get("author") or {}
+        if author.get("name"):
+            lines.append(author["name"])
+        if embed.get("title"):
+            lines.append(embed["title"])
+        if embed.get("description"):
+            lines.append(embed["description"])
+        for field in embed.get("fields") or []:
+            name = field.get("name", "")
+            value = field.get("value", "")
+            if name and value:
+                lines.append(f"{name}: {value}")
+            elif value:
+                lines.append(value)
+        footer = embed.get("footer") or {}
+        if footer.get("text"):
+            lines.append(footer["text"])
+        if lines:
+            parts.append("\n".join(lines))
+    return "\n---\n".join(parts)
 
 
 class SendRequestCommunityRequest(BaseModel):
@@ -38,7 +73,11 @@ class MessagingModule(BaseModule):
 
         @app.get("/api/v1/contacts")
         def get_contacts():
-            return account.contacts
+            return {
+                key: contact
+                for key, contact in account.contacts.items()
+                if contact.get("mutual")
+            }
 
         @app.post("/api/v1/contacts", status_code=201)
         def add_contact(payload: AddContactRequest):
@@ -92,6 +131,52 @@ class MessagingModule(BaseModule):
             if not payload.text:
                 raise HTTPException(status_code=400, detail="Message text is required")
             account.send_message(chat_id, payload.text)
+            return {"status": "ok"}
+
+        @app.post("/api/v1/messages/{compressed_key}", status_code=201)
+        def send_message_to_user(compressed_key: str, payload: SendMessageToUserRequest):
+            """Send a message to a mutual contact using its compressed key.
+
+            The path `compressed_key` is looked up in `account.contacts`
+            (falling back to the raw public key `0x...`). Only mutual
+            contacts can be messaged.
+            """
+            text = payload.content
+            if not text and payload.embeds:
+                text = _render_embeds_to_text(payload.embeds)
+            if not text:
+                raise HTTPException(status_code=400, detail="Message content is required")
+            if len(text) > 2000:
+                raise HTTPException(status_code=400, detail="Message too long")
+
+            contact = None
+            for current in account.contacts.values():
+                if not current.get("mutual"):
+                    continue
+                if current.get("compressed_key") == compressed_key:
+                    contact = current
+                    break
+            if contact is None and compressed_key.startswith("0x"):
+                for current in account.contacts.values():
+                    if not current.get("mutual"):
+                        continue
+                    if current.get("public_key") == compressed_key:
+                        contact = current
+                        break
+            if contact is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Contact not found or not a mutual contact",
+                )
+
+            try:
+                account.send_message(contact["public_key"], text)
+            except MessageTooLongError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            except SendContentError as e:
+                raise HTTPException(status_code=502, detail=str(e))
+            except Exception as e:  # backend/unexpected failure
+                raise HTTPException(status_code=502, detail="Failed to send message")
             return {"status": "ok"}
 
         @app.get("/api/v1/communities")

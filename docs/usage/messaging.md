@@ -78,6 +78,30 @@ Response `200`:
 
 Error `404` — contact not found or already removed.
 
+### `GET /api/v1/contacts`
+
+List all **mutual** contacts (contacts that have accepted the bot's contact request).
+
+```bash
+curl http://localhost:8081/api/v1/contacts
+```
+
+Response `200` — a map of contact public key to contact details. Only contacts with `mutual: true` are included:
+
+```json
+{
+  "0x...": {
+    "public_key": "0x...",
+    "chat_id": "0x...",
+    "compressed_key": "zQ...",
+    "display_name": "Alice",
+    "mutual": true
+  }
+}
+```
+
+Each contact includes a `compressed_key` (the Status chat key, e.g. `zQ...`) which can be used with `POST /api/v1/messages/{compressed_key}`.
+
 ### `GET /api/v1/chats`
 
 List all available chats (contacts, community channels, and group chats).
@@ -143,6 +167,52 @@ Response `201`:
 ```json
 {"status": "ok"}
 ```
+
+### `POST /api/v1/messages/{compressed_key}`
+
+Send a message to a mutual contact using Discord webhook-style payload. The path parameter `{compressed_key}` is the contact's compressed key (`zQ...`) as returned by `GET /api/v1/contacts`. Only mutual contacts can be messaged. Falls back to matching a raw public key (`0x...`) if provided directly.
+
+```bash
+curl -X POST http://localhost:8081/api/v1/messages/zQ... \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Hello from the bot!"}'
+```
+
+Request body:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `content` | `string` | No* | Plain-text message content (Discord `content` field) |
+| `embeds` | `list[object]` | No* | Discord-style embed objects, rendered to plain text |
+
+\* At least one of `content` or `embeds` is required. If both are provided, `content` takes precedence.
+
+Embeds are rendered to plain text using the embed's `author.name`, `title`, `description`, `fields` (as `name: value`), and `footer.text`, with multiple embeds separated by `---`.
+
+Example with embeds:
+
+```bash
+curl -X POST http://localhost:8081/api/v1/messages/zQ... \
+  -H "Content-Type: application/json" \
+  -d '{
+    "embeds": [{
+      "author": {"name": "Alert"},
+      "title": "Server down",
+      "description": "prod-east-1 is unreachable",
+      "fields": [{"name": "Severity", "value": "critical"}],
+      "footer": {"text": "monitoring-bot"}
+    }]
+  }'
+```
+
+Response `201`:
+```json
+{"status": "ok"}
+```
+
+Error `400` — missing/empty message content, or message longer than 2000 characters.
+Error `404` — contact not found or not a mutual contact.
+Error `502` — failure sending the message to the Status backend.
 
 ### `GET /api/v1/communities`
 
