@@ -6,7 +6,7 @@ from sqlalchemy import Column, DateTime, Integer, String, select
 from status_bot import Base
 from status_bot.database import Database
 from status_bot.modules.base import ModuleConfig, ModuleContext
-from status_bot.modules.engagement import Engagement
+from status_bot.modules.engagement.main import Engagement
 
 
 # A model defined by a module at import time: registered on the shared Base,
