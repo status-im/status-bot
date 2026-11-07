@@ -184,9 +184,21 @@ Rows that were not purged can be spotted with `SELECT ... WHERE id NOT LIKE 'enc
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `directories` | `list[str]` | `["./modules", "bot/modules"]` | Directories to scan for module `.py` files |
+| `directories` | `list[str]` | `["./modules", "bot/modules"]` | Directories scanned for additional modules |
 | `enabled` | `list[str]` | `[]` | List of module names to enable |
 | `settings` | `dict` | `{}` | Per-module settings (each module defines its own schema) |
+| `config_directory` | `str` | `null` | Directory holding per-module YAML files named `<module-name>.yaml`|
+
+Each module configuration can be done either with yaml file `<module-name>.yaml` in `config_directory` or inside the main configuration file under the `modules.settings.<module-name>` key.
+
+When both `module-name.py` and `module-name/main.py` exist in the same scanned
+directory, the directory version is loaded and a warning is logged.
+
+Per-module YAML files are deep-merged over `modules.settings.<module-name>`,
+the module YAML winning on conflicting keys. Environment variables
+(`MODULES__SETTINGS__<MODULE>__<KEY>`) still take precedence over both. A
+malformed module YAML is logged as an error and the module falls back to its
+`config.yaml` settings.
 
 The `api_server` module is auto-loaded whenever `api.enable` is `true` — it does not need to be listed in `enabled`.
 
@@ -198,7 +210,11 @@ modules:
         - messaging
     settings:
         messaging: {}
+    config_directory: ./module-configs   # ./module-configs/messaging.yaml
 ```
+
+> **Docker**: mount both the modules directory and the config directory into the
+> container for external modules and their YAML files to be visible.
 
 ---
 

@@ -58,6 +58,7 @@ class ModulesConfig(BaseModel):
     directories: list[str] = ["./modules", "bot/modules"]
     enabled: list[str] = []
     settings: dict = {}
+    config_directory: Optional[str] = None
 
 
 class Config(BaseSettings):

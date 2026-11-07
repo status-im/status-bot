@@ -9,6 +9,9 @@
     * Metrics for `community_monitoring` module
 * **API metrics** - New `api_server` module with API endpoint metrics
 * **Mandatory config validation** - `BaseModule` verifies required properties at startup via `_verify_mandatory_config()`
+* **Modules**:
+    - Will load the `main.py` file of a module sub directory. Allow to organize the code in a better way.
+    - Load config file per module to help organize.
 
 ## Changes
 
